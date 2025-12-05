@@ -1,6 +1,6 @@
 generator client {
     provider = "prisma-client"
-    output   = "generated/prisma"
+    output   = "./generated"
 }
 
 datasource db {
@@ -8,11 +8,42 @@ datasource db {
     // url      = env("DATABASE_URL")
 }
 
-model Post {
-    id        Int      @id @default(autoincrement())
-    name      String
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
+model Clients {
+    id         Int      @id @default(autoincrement())
+    createdAt  DateTime @default(now())
+    name       String
+    telegramId String
+}
 
-    @@index([name])
+model Configs {
+    id        Int       @id
+    createdAt DateTime  @default(now())
+    username  String
+    vpnKey    Json
+    protocol  Protocols
+}
+
+model Logs {
+    id        Int        @id @default(autoincrement())
+    createdAt DateTime   @default(now())
+    logType   LogTypes
+    levelType LevelTypes
+    message   String
+}
+
+enum Protocols {
+    AMNEZIAWG
+    XRAY
+}
+
+enum LevelTypes {
+    INFO
+    WARNING
+    ERROR
+}
+
+enum LogTypes {
+    TELEGRAM
+    SERVER
+    CLIENT
 }
