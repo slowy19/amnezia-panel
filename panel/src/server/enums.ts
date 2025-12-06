@@ -1,17 +1,24 @@
-import { LevelTypes, LogTypes } from "prisma/generated/enums";
+import { LevelTypes, LogTypes, Protocols } from 'prisma/generated/enums';
 
-export const levelTypeEnum = LevelTypes;
+const protocolEnum = Protocols;
 
-export const LevelTypeFilterEnum = {
+const ProtocolFilterEnum = {
+    All: 'All',
+};
+
+export type ProtocolsFilter = keyof typeof ProtocolFilterEnum | keyof typeof protocolEnum;
+
+const levelTypeEnum = LevelTypes;
+
+const LevelTypeFilterEnum = {
     All: 'All',
 };
 
 export type LevelTypesFilter = keyof typeof LevelTypeFilterEnum | keyof typeof levelTypeEnum;
 
+const logTypeEnum = LogTypes;
 
-export const logTypeEnum = LogTypes;
-
-export const LogTypeFilterEnum = {
+const LogTypeFilterEnum = {
     All: 'All',
 };
 

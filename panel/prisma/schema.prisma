@@ -12,18 +12,19 @@ model Clients {
     id         Int       @id @default(autoincrement())
     createdAt  DateTime  @default(now())
     name       String
-    telegramId String
+    telegramId String?
     Configs    Configs[]
 }
 
 model Configs {
-    id        Int       @id
+    id        String    @id
     createdAt DateTime  @default(now())
     username  String
     vpnKey    Json
+    expiresAt String?
     protocol  Protocols
-    clientId  Int
-    Clients   Clients   @relation(fields: [clientId], references: [id])
+    clientId  Int?
+    Clients   Clients?  @relation(fields: [clientId], references: [id])
 }
 
 model Logs {

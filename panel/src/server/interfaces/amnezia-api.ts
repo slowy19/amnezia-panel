@@ -1,6 +1,6 @@
 export type Protocol = 'amneziawg' | 'xray';
 
-interface IDevice {
+export interface IDevice {
     id: string;
     name: string;
     allowedIps: string[];
@@ -15,7 +15,7 @@ interface IDevice {
     protocol: Protocol;
 }
 
-interface IUser {
+export interface IUser {
     username: string;
     devices: IDevice[];
 }

@@ -15,6 +15,7 @@ export const env = createEnv({
         AMNEZIA_API_PORT: z.string(),
         AMNEZIA_API_KEY: z.string(),
         TELEGRAM_BOT_TOKEN: z.string().optional(),
+        ENCRYPTION_KEY: z.string()
     },
 
     /**
@@ -37,6 +38,7 @@ export const env = createEnv({
         AMNEZIA_API_PORT: process.env.AMNEZIA_API_PORT,
         AMNEZIA_API_KEY: process.env.AMNEZIA_API_KEY,
         TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+        ENCRYPTION_KEY: process.env.ENCRYPTION_KEY
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially

@@ -10,6 +10,17 @@ import type {
     ServerBackup,
 } from '../interfaces/amnezia-api';
 
+interface UniversalResponse {
+    ok: boolean;
+    status: number;
+    statusText: string;
+    headers: {
+        get(name: string): string | null;
+    };
+    text(): Promise<string>;
+    json(): Promise<any>;
+}
+
 class AmneziaApiService {
     private readonly baseUrl: string;
     private readonly apiKey: string;
@@ -18,7 +29,7 @@ class AmneziaApiService {
     private readonly retryDelay = 1000;
 
     constructor() {
-        this.baseUrl = `http://${process.env.AMNEZIA_API_HOST}:${process.env.AMNEZIA_API_PORT}/`; // change
+        this.baseUrl = `https://${process.env.AMNEZIA_API_HOST}:${process.env.AMNEZIA_API_PORT}/`;
         this.apiKey = process.env.AMNEZIA_API_KEY!;
     }
 
@@ -60,7 +71,45 @@ class AmneziaApiService {
                     body: body ? JSON.stringify(body) : undefined,
                 };
 
-                const response = await fetch(url, fetchOptions);
+                let response: UniversalResponse;
+
+                if (typeof window === 'undefined') {
+                    const nodeFetch = await import('node-fetch');
+                    const { Agent } = await import('https');
+
+                    const agent = new Agent({
+                        rejectUnauthorized: false,
+                    });
+
+                    const rawResponse = await nodeFetch.default(url, {
+                        ...fetchOptions,
+                        agent,
+                    } as any);
+
+                    response = {
+                        ok: rawResponse.ok,
+                        status: rawResponse.status,
+                        statusText: rawResponse.statusText,
+                        headers: {
+                            get: (name: string) => rawResponse.headers.get(name),
+                        },
+                        text: () => rawResponse.text(),
+                        json: () => rawResponse.json() as Promise<any>,
+                    };
+                } else {
+                    const rawResponse = await fetch(url, fetchOptions);
+
+                    response = {
+                        ok: rawResponse.ok,
+                        status: rawResponse.status,
+                        statusText: rawResponse.statusText,
+                        headers: {
+                            get: (name: string) => rawResponse.headers.get(name),
+                        },
+                        text: () => rawResponse.text(),
+                        json: () => rawResponse.json() as Promise<any>,
+                    };
+                }
 
                 if (!response.ok) {
                     if (response.status === 400) {
