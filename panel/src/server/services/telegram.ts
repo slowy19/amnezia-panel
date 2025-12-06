@@ -4,7 +4,7 @@ import type { SendMessageParams, TelegramMessageResponse } from '../interfaces/t
 import { logsService } from './logs';
 
 class TelegramService {
-    private baseUrl: string;
+    private readonly baseUrl: string;
     private readonly maxRetries = 3;
     private readonly retryDelay = 1000;
 
@@ -74,8 +74,6 @@ class TelegramService {
                         continue;
                     }
 
-                    await logsService.createLog('TELEGRAM', 'ERROR', `Error: ${response.text}`);
-
                     throw new TRPCError({
                         code: getTrpcErrorCode(response.status),
                         message: `Telegram API error: ${response.statusText}`,
@@ -91,12 +89,6 @@ class TelegramService {
                         data.description?.includes('bot was blocked by the user') ||
                         data.description?.includes('bot was kicked')
                     ) {
-                        await logsService.createLog(
-                            'TELEGRAM',
-                            'ERROR',
-                            'Bot was blocked by client'
-                        );
-
                         throw new TRPCError({
                             code: errorCode,
                             message: 'Bot was blocked by client',
@@ -104,19 +96,11 @@ class TelegramService {
                     }
 
                     if (data.description?.includes('chat not found')) {
-                        await logsService.createLog(
-                            'TELEGRAM',
-                            'ERROR',
-                            'Client not started a bot'
-                        );
-
                         throw new TRPCError({
                             code: errorCode,
                             message: 'Client not started a bot',
                         });
                     }
-
-                    await logsService.createLog('TELEGRAM', 'ERROR', `Error: ${data.description}`);
 
                     throw new TRPCError({
                         code: errorCode,
@@ -131,12 +115,6 @@ class TelegramService {
                 }
 
                 if (attempt === this.maxRetries) {
-                    await logsService.createLog(
-                        'TELEGRAM',
-                        'ERROR',
-                        `Error: ${error instanceof Error ? error.message : 'Unknown error'}`
-                    );
-
                     throw new TRPCError({
                         code: 'INTERNAL_SERVER_ERROR',
                         message: `Telegram API request failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -146,12 +124,6 @@ class TelegramService {
                 await this.sleep(this.retryDelay * attempt);
             }
         }
-
-        await logsService.createLog(
-            'TELEGRAM',
-            'ERROR',
-            'Telegram API request failed after maximum retries'
-        );
 
         throw new TRPCError({
             code: 'TIMEOUT',
@@ -175,15 +147,15 @@ class TelegramService {
                 }
             );
         } catch (error) {
-            if (error instanceof TRPCError) {
-                throw error;
-            }
-
             await logsService.createLog(
                 'TELEGRAM',
                 'ERROR',
-                `Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to send Telegram message: ${error instanceof TRPCError || error instanceof Error ? error.message : 'Unknown error'}`
             );
+
+            if (error instanceof TRPCError) {
+                throw error;
+            }
 
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
@@ -210,15 +182,15 @@ class TelegramService {
                 reply_to_message_id: params.replyToMessageId,
             });
         } catch (error) {
-            if (error instanceof TRPCError) {
-                throw error;
-            }
-
             await logsService.createLog(
                 'TELEGRAM',
                 'ERROR',
-                `Failed to send document: ${error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to send document: ${error instanceof TRPCError || error instanceof Error ? error.message : 'Unknown error'}`
             );
+
+            if (error instanceof TRPCError) {
+                throw error;
+            }
 
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
@@ -231,15 +203,15 @@ class TelegramService {
         try {
             return await this.makeRequestWithRetry('getMe', this.getFetchOptions('GET'));
         } catch (error) {
-            if (error instanceof TRPCError) {
-                throw error;
-            }
-
             await logsService.createLog(
                 'TELEGRAM',
                 'ERROR',
-                `Failed to get bot info: ${error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to get bot info: ${error instanceof TRPCError || error instanceof Error ? error.message : 'Unknown error'}`
             );
+
+            if (error instanceof TRPCError) {
+                throw error;
+            }
 
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
