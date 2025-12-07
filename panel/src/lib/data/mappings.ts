@@ -10,6 +10,11 @@ export const protocolsApiMapping: Record<Protocols, 'amneziawg' | 'xray'> = {
     [Protocols.XRAY]: 'xray',
 };
 
+export const apiProtocolsMapping: Record<'amneziawg' | 'xray', Protocols> = {
+    ['amneziawg']: Protocols.AMNEZIAWG ,
+    ['xray']: Protocols.XRAY,
+};
+
 export const levelTypesMapping: Record<LevelTypes, string> = {
     [LevelTypes.INFO]: 'Info',
     [LevelTypes.WARNING]: 'Warning',

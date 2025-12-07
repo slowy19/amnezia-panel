@@ -13,7 +13,7 @@ export const serverRouter = createTRPCRouter({
             z.object({
                 search: z.string().optional(),
                 page: z.number().min(1),
-                limit: z.string().min(25),
+                limit: z.string(),
                 levelType: z.string() as z.ZodType<LevelTypesFilter>,
                 logType: z.string() as z.ZodType<LogTypes>,
             })

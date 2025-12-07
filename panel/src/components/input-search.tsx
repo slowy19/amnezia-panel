@@ -27,7 +27,7 @@ export const InputSearchLoader = ({ placeholder, value, onChange, isLoading, cla
                 <Input
                     id={id}
                     type="search"
-                    placeholder={placeholder || 'Поиск...'}
+                    placeholder={placeholder || 'Search...'}
                     value={value}
                     onChange={onChange}
                     ref={ref}

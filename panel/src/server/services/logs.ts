@@ -32,6 +32,7 @@ class LogsService {
 
     async getLogs(query: IGetLogs): Promise<{
         logs: {
+            id: number;
             createdAt: Date;
             logType: LogTypes;
             levelType: LevelTypes;
@@ -66,6 +67,7 @@ class LogsService {
                 db.logs.findMany({
                     where: whereConditions,
                     select: {
+                        id: true,
                         createdAt: true,
                         logType: true,
                         levelType: true,

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -22,28 +22,33 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2 } from 'lucide-react';
+import { Loader2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/trpc/react';
-import { createConfigSchema, type createConfigFormData } from '@/lib/schemas/configs';
+import { updateClientSchema, type updateClientFormData } from '@/lib/schemas/clients';
 
-export function CreateConfigDialog() {
+interface Props {
+    id?: number;
+    name?: string;
+    telegramId?: string | null;
+}
+
+export function UpdateClientDialog({ id, name, telegramId }: Props) {
     const [open, setOpen] = useState(false);
     const utils = api.useUtils();
 
-    const form = useForm<createConfigFormData>({
-        resolver: zodResolver(createConfigSchema),
+    const form = useForm<updateClientFormData>({
+        resolver: zodResolver(updateClientSchema),
         defaultValues: {
-            clientId: undefined,
-            username: '',
-            expiresAt: '',
-            protocol: 'XRAY',
+            id,
+            name,
+            telegramId: telegramId || undefined,
         },
     });
 
-    const createConfig = api.configs.createConfig.useMutation({
+    const updateClient = api.clients.updateClient.useMutation({
         onSuccess: () => {
-            toast.success('Config was successfully created');
+            toast.success('Client was successfully updated');
             utils.clients.getClientsWithConfigs.invalidate();
             setOpen(false);
             form.reset();
@@ -55,24 +60,31 @@ export function CreateConfigDialog() {
         },
     });
 
-    const onSubmit = (data: createConfigFormData) => {
-        createConfig.mutate(data);
+    const onSubmit = (data: updateClientFormData) => {
+        updateClient.mutate(data);
     };
+
+    useEffect(() => {
+        if (!id || !name) return;
+
+        form.reset({
+            id,
+            name,
+            telegramId: telegramId || undefined,
+        });
+    }, [id, name, telegramId]);
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button className="cursor-pointer" variant={'outline'}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create config
+                <Button variant="ghost" size="sm" className="cursor-pointer">
+                    <Edit className="h-4 w-4" />
                 </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[525px]">
                 <DialogHeader>
-                    <DialogTitle>Create config</DialogTitle>
-                    <DialogDescription>
-                        Fill info about new config
-                    </DialogDescription>
+                    <DialogTitle>Update client</DialogTitle>
+                    <DialogDescription>Change client info</DialogDescription>
                 </DialogHeader>
 
                 <Form {...form}>
@@ -83,7 +95,7 @@ export function CreateConfigDialog() {
                             render={({ field }) => (
                                 <FormItem>
                                     <FormLabel>
-                                        Название <span className="text-destructive">*</span>
+                                        Name <span className="text-destructive">*</span>
                                     </FormLabel>
                                     <FormControl>
                                         <Input placeholder="Enter a name" {...field} />
@@ -92,19 +104,34 @@ export function CreateConfigDialog() {
                                 </FormItem>
                             )}
                         />
+
+                        <FormField
+                            control={form.control}
+                            name="telegramId"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Telegram Chat ID (optional)</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder="Enter a Telegram Chat ID" {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
+                        />
+
                         <DialogFooter>
                             <Button
                                 type="button"
                                 variant="outline"
                                 onClick={() => setOpen(false)}
-                                disabled={createConfig.isPending}>
-                                Отмена
+                                disabled={updateClient.isPending}>
+                                Cancel
                             </Button>
-                            <Button type="submit" disabled={createConfig.isPending}>
-                                {createConfig.isPending && (
+                            <Button type="submit" disabled={updateClient.isPending}>
+                                {updateClient.isPending && (
                                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 )}
-                                {createConfig.isPending ? 'Creating...' : 'Create'}
+                                {updateClient.isPending ? 'Updating...' : 'Update'}
                             </Button>
                         </DialogFooter>
                     </form>

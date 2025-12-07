@@ -5,12 +5,17 @@ import type { ProtocolsFilter } from '@/server/enums';
 import type { Prisma } from 'prisma/generated/client';
 import { createClientSchema, updateClientSchema } from '@/lib/schemas/clients';
 import { amneziaApiService } from '@/server/services/amnezia-api';
-import { protocolsApiMapping } from '@/lib/data/mappings';
+import { apiProtocolsMapping, protocolsApiMapping } from '@/lib/data/mappings';
 import { encryptionService } from '@/server/services/encryption';
 import type { IDevice } from '@/server/interfaces/amnezia-api';
 import { logsService } from '@/server/services/logs';
 
 export const clientsRouter = createTRPCRouter({
+    getClients: publicProcedure.query(async ({ ctx }) => {
+        return await ctx.db.clients.findMany({
+            select: { id: true, name: true },
+        });
+    }),
     getClientsWithConfigs: publicProcedure
         .input(
             z.object({
@@ -87,12 +92,12 @@ export const clientsRouter = createTRPCRouter({
                     return {
                         ...config,
                         online: apiDevice.online,
-                        lastHandshake: apiDevice.lastHandshake,
+                        lastHandshake: String(apiDevice.lastHandshake),
                         traffic: apiDevice.traffic,
                         allowedIps: apiDevice.allowedIps,
                         endpoint: apiDevice.endpoint,
                         expiresAt: String(apiDevice.expiresAt) || config.expiresAt,
-                        protocol: apiDevice.protocol,
+                        protocol: apiProtocolsMapping[apiDevice.protocol],
                         username: config.username,
                         createdAt: config.createdAt,
                         clientId: config.clientId,
@@ -119,10 +124,10 @@ export const clientsRouter = createTRPCRouter({
                             createdAt: new Date(),
                             username: user.username,
                             expiresAt: device.expiresAt ? String(device.expiresAt) : null,
-                            protocol: device.protocol,
+                            protocol: apiProtocolsMapping[device.protocol],
                             clientId: null,
                             online: device.online,
-                            lastHandshake: device.lastHandshake,
+                            lastHandshake: String(device.lastHandshake),
                             traffic: device.traffic,
                             allowedIps: device.allowedIps,
                             endpoint: device.endpoint,

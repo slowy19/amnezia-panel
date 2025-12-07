@@ -9,8 +9,9 @@ import debounce from 'lodash.debounce';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { CreateConfigDialog } from '@/components/create-config-dialog';
+import { CreateConfigDialog } from '@/app/_components/create-config-dialog';
 import { protocolsMapping } from '@/lib/data/mappings';
+import { ConfigsWithClientsTable } from './_components/clients-table';
 
 export default function ClientsPage() {
     const [search, setSearch] = useState('');
@@ -95,7 +96,7 @@ export default function ClientsPage() {
                         </div>
                     ) : (
                         <div className="rounded-md border">
-                            <ConfigsTableWithClients
+                            <ConfigsWithClientsTable
                                 clients={data?.clients || []}
                                 orphanConfigs={data?.orphanConfigs || []}
                             />

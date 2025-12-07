@@ -7,6 +7,7 @@ import { protocolsApiMapping } from '@/lib/data/mappings';
 import { encryptionService } from '@/server/services/encryption';
 import { TRPCError } from '@trpc/server';
 import { logsService } from '@/server/services/logs';
+import { Protocols } from 'prisma/generated/enums';
 
 export const configsRouter = createTRPCRouter({
     createConfig: publicProcedure.input(createConfigSchema).mutation(async ({ ctx, input }) => {
@@ -23,7 +24,7 @@ export const configsRouter = createTRPCRouter({
         await ctx.db.configs.create({
             data: {
                 id: createdConfig.client.id,
-                clientId: clientId || null,
+                clientId: Number(clientId) || null,
                 username,
                 expiresAt,
                 protocol,
@@ -41,7 +42,7 @@ export const configsRouter = createTRPCRouter({
 
             const updatedConfig = await ctx.db.configs.update({
                 where: { id },
-                data: { clientId },
+                data: { clientId: Number(clientId) },
                 select: { username: true },
             });
 
@@ -53,28 +54,32 @@ export const configsRouter = createTRPCRouter({
         }),
 
     deleteConfig: publicProcedure
-        .input(z.object({ id: z.string() }))
+        .input(z.object({ id: z.string(), protocol: z.enum(Protocols) }))
         .mutation(async ({ ctx, input }) => {
-            const { id } = input;
+            const { id, protocol } = input;
 
             const foundConfig = await ctx.db.configs.findUnique({
                 where: { id },
                 select: { protocol: true },
             });
-            if (!foundConfig)
-                throw new TRPCError({ code: 'NOT_FOUND', message: 'Not found config' });
 
-            await amneziaApiService.deleteConfig(id, protocolsApiMapping[foundConfig.protocol]);
+            await amneziaApiService.deleteConfig(id, protocolsApiMapping[protocol]);
 
-            const deletedConfig = await ctx.db.configs.delete({
-                where: { id },
-                select: { username: true },
-            });
+            let deletedConfig: {
+                username: string;
+            } | null = null;
+
+            if (foundConfig) {
+                deletedConfig = await ctx.db.configs.delete({
+                    where: { id },
+                    select: { username: true },
+                });
+            }
 
             await logsService.createLog(
                 'CLIENT',
                 'WARNING',
-                `Config ${deletedConfig.username} deleted`
+                `Config ${deletedConfig?.username || 'that does not exist in database'} deleted`
             );
         }),
 

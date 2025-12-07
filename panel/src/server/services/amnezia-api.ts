@@ -29,12 +29,13 @@ class AmneziaApiService {
     private readonly retryDelay = 1000;
 
     constructor() {
-        this.baseUrl = `https://${process.env.AMNEZIA_API_HOST}:${process.env.AMNEZIA_API_PORT}/`;
+        this.baseUrl = `http://${process.env.AMNEZIA_API_HOST}:${process.env.AMNEZIA_API_PORT}`;
         this.apiKey = process.env.AMNEZIA_API_KEY!;
     }
 
     private getFetchOptions(method: string): RequestInit {
         const headers: HeadersInit = {
+            Accept: 'application/json',
             'Content-Type': 'application/json',
             'x-api-key': this.apiKey,
         };
@@ -71,45 +72,46 @@ class AmneziaApiService {
                     body: body ? JSON.stringify(body) : undefined,
                 };
 
-                let response: UniversalResponse;
+                // let response: UniversalResponse;
 
-                if (typeof window === 'undefined') {
-                    const nodeFetch = await import('node-fetch');
-                    const { Agent } = await import('https');
+                // if (typeof window === 'undefined') {
+                //     const nodeFetch = await import('node-fetch');
+                //     const { Agent } = await import('https');
 
-                    const agent = new Agent({
-                        rejectUnauthorized: false,
-                    });
+                //     const agent = new Agent({
+                //         rejectUnauthorized: false,
+                //     });
 
-                    const rawResponse = await nodeFetch.default(url, {
-                        ...fetchOptions,
-                        agent,
-                    } as any);
+                //     const rawResponse = await nodeFetch.default(url, {
+                //         ...fetchOptions,
+                //         agent,
+                //     } as any);
 
-                    response = {
-                        ok: rawResponse.ok,
-                        status: rawResponse.status,
-                        statusText: rawResponse.statusText,
-                        headers: {
-                            get: (name: string) => rawResponse.headers.get(name),
-                        },
-                        text: () => rawResponse.text(),
-                        json: () => rawResponse.json() as Promise<any>,
-                    };
-                } else {
-                    const rawResponse = await fetch(url, fetchOptions);
+                //     response = {
+                //         ok: rawResponse.ok,
+                //         status: rawResponse.status,
+                //         statusText: rawResponse.statusText,
+                //         headers: {
+                //             get: (name: string) => rawResponse.headers.get(name),
+                //         },
+                //         text: () => rawResponse.text(),
+                //         json: () => rawResponse.json() as Promise<any>,
+                //     };
+                // } else {
+                // const rawResponse = await fetch(url, fetchOptions);
+                const response = await fetch(url, fetchOptions);
 
-                    response = {
-                        ok: rawResponse.ok,
-                        status: rawResponse.status,
-                        statusText: rawResponse.statusText,
-                        headers: {
-                            get: (name: string) => rawResponse.headers.get(name),
-                        },
-                        text: () => rawResponse.text(),
-                        json: () => rawResponse.json() as Promise<any>,
-                    };
-                }
+                // response = {
+                //     ok: rawResponse.ok,
+                //     status: rawResponse.status,
+                //     statusText: rawResponse.statusText,
+                //     headers: {
+                //         get: (name: string) => rawResponse.headers.get(name),
+                //     },
+                //     text: () => rawResponse.text(),
+                //     json: () => rawResponse.json() as Promise<any>,
+                // };
+                // }
 
                 if (!response.ok) {
                     if (response.status === 400) {
@@ -147,16 +149,14 @@ class AmneziaApiService {
                         });
                     }
 
-                    const errorText = await response.text();
-
                     throw new TRPCError({
                         code: getTrpcErrorCode(response.status),
-                        message: `Amnezia API error: ${errorText}`,
+                        message: `Amnezia API error: ${await response.status}`,
                     });
                 }
 
                 const data = await response.json();
-                return data.result as T;
+                return data as T;
             } catch (error) {
                 if (error instanceof TRPCError) {
                     throw error;
@@ -179,7 +179,7 @@ class AmneziaApiService {
         });
     }
 
-    async getConfigs(skip: number = 0, limit: number = 500): Promise<GetUsersResponse> {
+    async getConfigs(skip: number = 0, limit: number = 100): Promise<GetUsersResponse> {
         try {
             return await this.makeRequestWithRetry<GetUsersResponse>(
                 'users',
