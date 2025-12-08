@@ -3,11 +3,13 @@ import { z } from 'zod';
 import { createTRPCRouter, publicProcedure } from '@/server/api/trpc';
 import { createConfigSchema, updateClientConfigSchema } from '@/lib/schemas/configs';
 import { amneziaApiService } from '@/server/services/amnezia-api';
-import { protocolsApiMapping } from '@/lib/data/mappings';
+import { protocolsApiMapping, protocolsMapping } from '@/lib/data/mappings';
 import { encryptionService } from '@/server/services/encryption';
 import { TRPCError } from '@trpc/server';
 import { logsService } from '@/server/services/logs';
 import { Protocols } from 'prisma/generated/enums';
+import { format } from 'date-fns';
+import { telegramService } from '@/server/services/telegram';
 
 export const configsRouter = createTRPCRouter({
     createConfig: publicProcedure.input(createConfigSchema).mutation(async ({ ctx, input }) => {
@@ -93,4 +95,56 @@ export const configsRouter = createTRPCRouter({
 
         return await encryptionService.decryptField(foundConfig?.vpnKey);
     }),
+
+    sendVpnKey: publicProcedure
+        .input(z.object({ id: z.string() }))
+        .mutation(async ({ ctx, input }) => {
+            const { id } = input;
+
+            const foundConfig = await ctx.db.configs.findUnique({
+                where: { id },
+                select: {
+                    vpnKey: true,
+                    username: true,
+                    expiresAt: true,
+                    protocol: true,
+                    Clients: { select: { name: true, telegramId: true } },
+                },
+            });
+            if (!foundConfig)
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Config not found' });
+
+            if (!foundConfig.Clients?.telegramId)
+                throw new TRPCError({
+                    code: 'NOT_FOUND',
+                    message: 'Client does not have a Telegram Chat ID',
+                });
+
+            const decryptedVpnKey = encryptionService.decryptField(foundConfig.vpnKey);
+            const expiryDate = foundConfig.expiresAt
+                ? format(new Date(Number(foundConfig.expiresAt) * 1000), 'MM/dd/yyyy')
+                : 'Not set';
+
+            const message = `
+🔐 New VPN configuration for <b>${foundConfig.username.startsWith(foundConfig.Clients.name) ? foundConfig.username.split('-')[1] : foundConfig.username}</b> from Ne4VPN
+Protocol: <b>${protocolsMapping[foundConfig.protocol] || 'Not specified'}</b>
+Expiration date: <b>${expiryDate}</b>
+<code>${decryptedVpnKey}</code>`;
+
+            if (message.length > 4096) {
+                await telegramService.sendInParts(foundConfig.Clients.telegramId, message, '');
+            } else {
+                await telegramService.sendMessage({
+                    chatId: foundConfig.Clients.telegramId,
+                    text: message,
+                    parseMode: 'HTML',
+                });
+            }
+
+            await logsService.createLog(
+                'TELEGRAM',
+                'INFO',
+                `VPN key of ${foundConfig?.username} sent`
+            );
+        }),
 });

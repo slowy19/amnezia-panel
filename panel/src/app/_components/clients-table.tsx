@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDownIcon, ChevronRightIcon, UserIcon } from 'lucide-react';
+import { ChevronDownIcon, ChevronRightIcon, Loader2, Send, UserIcon } from 'lucide-react';
 import { cn, formatBytes, formatDate, formatLastHandshake, getProtocolColor } from '@/lib/utils';
 import Link from 'next/link';
 import type { Protocols } from 'prisma/generated/enums';
@@ -20,6 +20,8 @@ import DeleteClientDialog from './delete-client-dialog';
 import { protocolsMapping } from '@/lib/data/mappings';
 import DeleteConfigDialog from './delete-config-dialog';
 import { ConfigDialog } from './config-dialog';
+import { api } from '@/trpc/react';
+import { toast } from 'sonner';
 
 interface ConfigsWithClientsProps {
     clients: Array<{
@@ -158,6 +160,20 @@ function ClientRow({
         }, 0);
     }, [client.configs]);
 
+    const sendMessages = api.clients.sendKeysForClient.useMutation({
+        onSuccess: () => {
+            toast.success('VPN configs were sent successfully');
+        },
+        onError: (error) => {
+            toast.error('Error sending configs');
+            console.error(error);
+        },
+    });
+
+    const onSubmit = () => {
+        sendMessages.mutate({ id: client.id });
+    };
+
     return (
         <>
             <TableRow>
@@ -205,7 +221,14 @@ function ClientRow({
                 </TableCell>
                 <TableCell>{formatBytes(totalTraffic)}</TableCell>
                 <TableCell>—</TableCell>
-                <TableCell>—</TableCell>
+                <TableCell>
+                    <Button disabled={sendMessages.isPending} onClick={onSubmit}>
+                        {sendMessages.isPending && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
+                        {sendMessages.isPending ? 'Sending...' : 'Send configs'}
+                    </Button>
+                </TableCell>
                 <TableCell>
                     <div className="flex items-center gap-2">
                         <UpdateClientDialog
@@ -249,7 +272,21 @@ function ConfigRow({
     isNested?: boolean;
 }>) {
     const totalTraffic = config.traffic.received + config.traffic.sent;
-    const NumberExpiresAt = Number(config.expiresAt)
+    const NumberExpiresAt = Number(config.expiresAt);
+
+    const sendMessage = api.configs.sendVpnKey.useMutation({
+        onSuccess: () => {
+            toast.success('VPN config were sent successfully');
+        },
+        onError: (error) => {
+            toast.error('Error sending config');
+            console.error(error);
+        },
+    });
+
+    const onSubmit = () => {
+        sendMessage.mutate({ id: config.id });
+    };
 
     return (
         <TableRow className={isNested ? 'bg-muted/20' : ''}>
@@ -281,6 +318,18 @@ function ConfigRow({
             <TableCell>
                 <div className="flex items-center gap-2">
                     <ConfigDialog config={config} />
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="cursor-pointer text-blue-400 hover:text-blue-600"
+                        onClick={onSubmit}
+                        disabled={sendMessage.isPending}>
+                        {sendMessage.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                            <Send className="h-4 w-4" />
+                        )}
+                    </Button>
                     <DeleteConfigDialog id={config.id} protocol={config.protocol} />
                 </div>
             </TableCell>

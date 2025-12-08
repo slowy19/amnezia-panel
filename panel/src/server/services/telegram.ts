@@ -53,6 +53,9 @@ class TelegramService {
         options: RequestInit,
         body?: any
     ): Promise<T> {
+        if (process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT !== 'true')
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'Not found Bot Token' });
+
         const url = `${this.baseUrl}/${endpoint}`;
 
         for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
@@ -161,6 +164,54 @@ class TelegramService {
                 code: 'INTERNAL_SERVER_ERROR',
                 message: `Failed to send Telegram message: ${error instanceof Error ? error.message : 'Unknown error'}`,
             });
+        }
+    }
+
+    async sendInParts(chatId: string, fullMessage: string, footer: string) {
+        const MAX_LENGTH = 4096;
+        const PART_SEPARATOR = '\n\n--- Continued ---\n\n';
+
+        let remainingText = fullMessage;
+        let partNumber = 1;
+
+        while (remainingText.length > 0) {
+            let currentPart = partNumber === 1 ? '' : `📄 Part ${partNumber}\n\n`;
+
+            const availableChars =
+                MAX_LENGTH - currentPart.length - (partNumber > 1 ? PART_SEPARATOR.length : 0);
+            const textToTake = Math.min(availableChars, remainingText.length);
+
+            let textPart = remainingText.substring(0, textToTake);
+
+            const lastNewLine = textPart.lastIndexOf('\n');
+            if (lastNewLine > textToTake - 100 && lastNewLine > 0) {
+                textPart = textPart.substring(0, lastNewLine);
+            }
+
+            if (partNumber > 1) {
+                textPart = PART_SEPARATOR + textPart;
+            }
+
+            textPart = currentPart + textPart;
+
+            if (remainingText.length - textPart.length + currentPart.length <= 0) {
+                textPart += footer;
+            }
+
+            await this.sendMessage({
+                chatId: chatId,
+                text: textPart,
+                parseMode: 'HTML',
+            });
+
+            remainingText = remainingText.substring(
+                textPart.length - currentPart.length - (partNumber > 1 ? PART_SEPARATOR.length : 0)
+            );
+            partNumber++;
+
+            if (remainingText.length > 0) {
+                await new Promise((resolve) => setTimeout(resolve, 500));
+            }
         }
     }
 

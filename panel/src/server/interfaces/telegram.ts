@@ -1,7 +1,10 @@
+type ParseModeType = 'HTML' | 'Markdown' | 'MarkdownV2'
+type ChatType = 'private' | 'group' | 'supergroup' | 'channel'
+
 export interface SendMessageParams {
     chatId: string | number;
     text: string;
-    parseMode?: 'HTML' | 'Markdown' | 'MarkdownV2';
+    parseMode?: ParseModeType;
     disableWebPagePreview?: boolean;
     disableNotification?: boolean;
     replyToMessageId?: number;
@@ -19,7 +22,7 @@ export interface TelegramMessageResponse {
     chat: {
         id: number;
         title?: string;
-        type: 'private' | 'group' | 'supergroup' | 'channel';
+        type: ChatType;
         username?: string;
         first_name?: string;
     };

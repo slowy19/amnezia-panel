@@ -7,11 +7,12 @@ import { InputSearchLoader } from '@/components/input-search';
 import { Loader } from '@/components/loader';
 import debounce from 'lodash.debounce';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Loader2, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { CreateConfigDialog } from '@/app/_components/create-config-dialog';
 import { protocolsMapping } from '@/lib/data/mappings';
 import { ConfigsWithClientsTable } from './_components/clients-table';
+import { toast } from 'sonner';
 
 export default function ClientsPage() {
     const [search, setSearch] = useState('');
@@ -35,6 +36,20 @@ export default function ClientsPage() {
         };
     }, []);
 
+    const sendMessages = api.clients.sendAllKeys.useMutation({
+        onSuccess: () => {
+            toast.success('VPN configs were sent successfully');
+        },
+        onError: (error) => {
+            toast.error('Error sending configs');
+            console.error(error);
+        },
+    });
+
+    const onSubmit = () => {
+        sendMessages.mutate();
+    };
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -57,35 +72,44 @@ export default function ClientsPage() {
                     <CardTitle>Clients table</CardTitle>
                 </CardHeader>
                 <CardContent>
-                    <div className="mb-6 flex items-center gap-4">
-                        <div className="bg-muted flex items-center gap-1 rounded-lg p-1">
-                            <Button
-                                variant={protocolFilter === 'All' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setProtocolFilter('All')}
-                                className="h-8">
-                                All
-                            </Button>
-                            <Button
-                                variant={protocolFilter === 'XRAY' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setProtocolFilter('XRAY')}
-                                className="h-8">
-                                {protocolsMapping['XRAY']}
-                            </Button>
-                            <Button
-                                variant={protocolFilter === 'AMNEZIAWG' ? 'default' : 'ghost'}
-                                size="sm"
-                                onClick={() => setProtocolFilter('AMNEZIAWG')}
-                                className="h-8">
-                                {protocolsMapping['AMNEZIAWG']}
-                            </Button>
+                    <div className="mb-6 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-muted flex items-center gap-1 rounded-lg p-1">
+                                <Button
+                                    variant={protocolFilter === 'All' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setProtocolFilter('All')}
+                                    className="h-8">
+                                    All
+                                </Button>
+                                <Button
+                                    variant={protocolFilter === 'XRAY' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setProtocolFilter('XRAY')}
+                                    className="h-8">
+                                    {protocolsMapping['XRAY']}
+                                </Button>
+                                <Button
+                                    variant={protocolFilter === 'AMNEZIAWG' ? 'default' : 'ghost'}
+                                    size="sm"
+                                    onClick={() => setProtocolFilter('AMNEZIAWG')}
+                                    className="h-8">
+                                    {protocolsMapping['AMNEZIAWG']}
+                                </Button>
+                            </div>
+                            <InputSearchLoader
+                                placeholder="Search by config name..."
+                                onChange={debouncedChangeHandler}
+                                isLoading={isLoading || isFetching}
+                            />
                         </div>
-                        <InputSearchLoader
-                            placeholder="Search by config name..."
-                            onChange={debouncedChangeHandler}
-                            isLoading={isLoading || isFetching}
-                        />
+
+                        <Button disabled={sendMessages.isPending} onClick={onSubmit}>
+                            {sendMessages.isPending && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            )}
+                            {sendMessages.isPending ? 'Sending...' : 'Send VPN configs to clients'}
+                        </Button>
                     </div>
 
                     {isLoading ? (

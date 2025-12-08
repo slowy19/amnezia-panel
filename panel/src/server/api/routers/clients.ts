@@ -5,10 +5,13 @@ import type { ProtocolsFilter } from '@/server/enums';
 import type { Prisma } from 'prisma/generated/client';
 import { createClientSchema, updateClientSchema } from '@/lib/schemas/clients';
 import { amneziaApiService } from '@/server/services/amnezia-api';
-import { apiProtocolsMapping, protocolsApiMapping } from '@/lib/data/mappings';
+import { apiProtocolsMapping, protocolsApiMapping, protocolsMapping } from '@/lib/data/mappings';
 import { encryptionService } from '@/server/services/encryption';
 import type { IDevice } from '@/server/interfaces/amnezia-api';
 import { logsService } from '@/server/services/logs';
+import { TRPCError } from '@trpc/server';
+import { telegramService } from '@/server/services/telegram';
+import { format } from 'date-fns';
 
 export const clientsRouter = createTRPCRouter({
     getClients: publicProcedure.query(async ({ ctx }) => {
@@ -229,4 +232,132 @@ export const clientsRouter = createTRPCRouter({
                 `Client ${deletedClient.name} deleted`
             );
         }),
+
+    sendKeysForClient: publicProcedure
+        .input(z.object({ id: z.number() }))
+        .mutation(async ({ ctx, input }) => {
+            const { id } = input;
+
+            const foundClient = await ctx.db.clients.findUnique({
+                where: { id },
+                select: {
+                    name: true,
+                    telegramId: true,
+                    Configs: {
+                        select: {
+                            vpnKey: true,
+                            username: true,
+                            protocol: true,
+                            expiresAt: true,
+                        },
+                    },
+                },
+            });
+
+            if (!foundClient || !foundClient.telegramId)
+                throw new TRPCError({ code: 'NOT_FOUND', message: 'Client not found' });
+
+            if (foundClient.Configs.length === 0) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: 'No VPN configurations found for this client',
+                });
+            }
+
+            const messages = foundClient.Configs.map((config) => {
+                const decryptedVpnKey = encryptionService.decryptField(config.vpnKey);
+                const expiryDate = config.expiresAt
+                    ? format(new Date(Number(config.expiresAt) * 1000), 'MM/dd/yyyy')
+                    : 'Not set';
+
+                return `
+Configuration for <b>${config.username.startsWith(foundClient.name) ? config.username.split('-')[1] : config.username}</b>
+Protocol: <b>${protocolsMapping[config.protocol] || 'Not specified'}</b>
+Expiration date: <b>${expiryDate}</b>
+<code>${decryptedVpnKey}</code>
+─────────────────────`;
+            });
+
+            const header = `🔐 <b>VPN configurations from ${process.env.NEXT_PUBLIC_VPN_NAME}</b>\n\n`;
+            const footer = `\n\n📦 Total configurations: ${foundClient.Configs.length}`;
+
+            const fullMessage = header + messages.join('\n') + footer;
+
+            if (fullMessage.length > 4096) {
+                await telegramService.sendInParts(foundClient.telegramId, fullMessage, footer);
+            } else {
+                await telegramService.sendMessage({
+                    chatId: foundClient.telegramId,
+                    text: fullMessage,
+                    parseMode: 'HTML',
+                });
+            }
+
+            await logsService.createLog(
+                'TELEGRAM',
+                'INFO',
+                `VPN keys sent for client ${foundClient.name}`
+            );
+        }),
+
+    sendAllKeys: publicProcedure.mutation(async ({ ctx }) => {
+        const foundClients = await ctx.db.clients.findMany({
+            select: {
+                name: true,
+                telegramId: true,
+                Configs: {
+                    select: {
+                        vpnKey: true,
+                        username: true,
+                        protocol: true,
+                        expiresAt: true,
+                    },
+                },
+            },
+        });
+
+        if (!foundClients) throw new TRPCError({ code: 'NOT_FOUND', message: 'Clients not found' });
+
+        for (const foundClient of foundClients) {
+            if (foundClient.Configs.length === 0 || !foundClient.telegramId) {
+                await logsService.createLog(
+                    'TELEGRAM',
+                    'WARNING',
+                    `VPN keys not sent for client ${foundClient.name}`
+                );
+                continue;
+            }
+
+            const messages = foundClient.Configs.map((config) => {
+                const decryptedVpnKey = encryptionService.decryptField(config.vpnKey);
+                const expiryDate = config.expiresAt
+                    ? format(new Date(Number(config.expiresAt) * 1000), 'MM/dd/yyyy')
+                    : 'Not set';
+
+                return `
+Configuration for <b>${config.username.startsWith(foundClient.name) ? config.username.split('-')[1] : config.username}</b>
+Protocol: <b>${protocolsMapping[config.protocol] || 'Not specified'}</b>
+Expiration date: <b>${expiryDate}</b>
+<code>${decryptedVpnKey}</code>
+─────────────────────`;
+            });
+
+            const header = `🔐 <b>VPN configurations from ${process.env.NEXT_PUBLIC_VPN_NAME}</b>\n\n`;
+            const footer = `\n\n📦 Total configurations: ${foundClient.Configs.length}`;
+
+            const fullMessage = header + messages.join('\n') + footer;
+
+            if (fullMessage.length > 4096) {
+                await telegramService.sendInParts(foundClient.telegramId, fullMessage, footer);
+            } else {
+                await telegramService.sendMessage({
+                    chatId: foundClient.telegramId,
+                    text: fullMessage,
+                    parseMode: 'HTML',
+                });
+            }
+        }
+
+        await logsService.createLog('TELEGRAM', 'INFO', `VPN keys sent for clients`);
+    }),
 });

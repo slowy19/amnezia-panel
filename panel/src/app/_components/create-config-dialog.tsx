@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -41,6 +41,7 @@ import { protocolsMapping } from '@/lib/data/mappings';
 
 export function CreateConfigDialog() {
     const [open, setOpen] = useState(false);
+    const [usernameTouched, setUsernameTouched] = useState(false);
     const utils = api.useUtils();
 
     const { data: clients } = api.clients.getClients.useQuery();
@@ -48,18 +49,47 @@ export function CreateConfigDialog() {
     const form = useForm<createConfigFormData>({
         resolver: zodResolver(createConfigSchema),
         defaultValues: {
-            clientId: undefined,
+            clientId: '',
             username: '',
             expiresAt: '',
             protocol: undefined,
         },
     });
 
+    const watchClientId = form.watch('clientId');
+
+    useEffect(() => {
+        if (watchClientId && watchClientId !== '') {
+            const selectedClient = clients?.find((client) => String(client.id) === watchClientId);
+            if (selectedClient) {
+                form.setValue('username', `${selectedClient.name}-`, {
+                    shouldValidate: true,
+                });
+            }
+        }
+    }, [watchClientId, clients, form, usernameTouched]);
+
+    useEffect(() => {
+        const subscription = form.watch((value, { name }) => {
+            if (name === 'username') {
+                setUsernameTouched(true);
+            }
+        });
+        return () => subscription.unsubscribe();
+    }, [form]);
+
+    useEffect(() => {
+        if (!open) {
+            setUsernameTouched(false);
+        }
+    }, [open]);
+
     const createConfig = api.configs.createConfig.useMutation({
         onSuccess: () => {
             toast.success('Config was created successfully');
             utils.clients.getClientsWithConfigs.invalidate();
             setOpen(false);
+            setUsernameTouched(false);
             form.reset();
         },
         onError: (error) => {
@@ -98,11 +128,9 @@ export function CreateConfigDialog() {
                                     <FormLabel>Client (Optional)</FormLabel>
                                     <Select
                                         onValueChange={(value) =>
-                                            field.onChange(
-                                                value === 'none' ? undefined : Number(value)
-                                            )
+                                            field.onChange(value === 'none' ? '' : value)
                                         }
-                                        value={field.value ? String(field.value) : 'none'}>
+                                        value={field.value || 'none'}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Select a client" />
@@ -112,7 +140,7 @@ export function CreateConfigDialog() {
                                             <SelectItem value="none">No client (Orphan)</SelectItem>
                                             {clients?.map((client) => (
                                                 <SelectItem
-                                                    key={client.id}
+                                                    key={String(client.id)}
                                                     value={String(client.id)}>
                                                     {client.name}
                                                 </SelectItem>
@@ -133,7 +161,14 @@ export function CreateConfigDialog() {
                                         Username <span className="text-destructive">*</span>
                                     </FormLabel>
                                     <FormControl>
-                                        <Input placeholder="Enter username" {...field} />
+                                        <Input
+                                            placeholder="Enter username"
+                                            {...field}
+                                            onChange={(e) => {
+                                                setUsernameTouched(true);
+                                                field.onChange(e);
+                                            }}
+                                        />
                                     </FormControl>
                                     <FormMessage />
                                 </FormItem>
