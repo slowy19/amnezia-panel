@@ -11,8 +11,23 @@ import {
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDownIcon, ChevronRightIcon, Loader2, Send, UserIcon } from 'lucide-react';
-import { cn, formatBytes, formatDate, formatLastHandshake, getProtocolColor } from '@/lib/utils';
+import {
+    Check,
+    ChevronDownIcon,
+    ChevronRightIcon,
+    Copy,
+    Loader2,
+    Send,
+    UserIcon,
+} from 'lucide-react';
+import {
+    cn,
+    formatBytes,
+    formatDate,
+    formatLastHandshake,
+    getProtocolColor,
+    telegramToastError,
+} from '@/lib/utils';
 import Link from 'next/link';
 import type { Protocols } from 'prisma/generated/enums';
 import { UpdateClientDialog } from './client-dialog';
@@ -144,6 +159,8 @@ function ClientRow({
     isExpanded: boolean;
     onToggle: () => void;
 }>) {
+    const [copiedChatId, setCopiedChatId] = useState(false);
+
     const configsWord = useMemo(() => {
         const count = client.configsCount;
 
@@ -160,18 +177,43 @@ function ClientRow({
         }, 0);
     }, [client.configs]);
 
-    const sendMessages = api.clients.sendKeysForClient.useMutation({
+    const sendConfigs = api.clients.sendKeysForClient.useMutation({
         onSuccess: () => {
             toast.success('VPN configs were sent successfully');
         },
         onError: (error) => {
-            toast.error('Error sending configs');
-            console.error(error);
+            telegramToastError(error);
         },
     });
 
-    const onSubmit = () => {
-        sendMessages.mutate({ id: client.id });
+    const onSubmitConfigs = () => {
+        sendConfigs.mutate({ id: client.id });
+    };
+
+    const sendLinks = api.clients.sendDownloadLinks.useMutation({
+        onSuccess: () => {
+            toast.success('AmneziaVPN links were sent successfully');
+        },
+        onError: (error) => {
+            telegramToastError(error);
+        },
+    });
+
+    const onSubmitLinks = () => {
+        sendLinks.mutate({ id: client.id });
+    };
+
+    const copyChatIdToClipboard = async (chatId: string | null) => {
+        if (!chatId) return;
+
+        try {
+            await navigator.clipboard.writeText(chatId);
+            setCopiedChatId(true);
+            toast.success('Telegram Chat ID copied to clipboard');
+            setTimeout(() => setCopiedChatId(false), 2000);
+        } catch (err) {
+            toast.error('Failed to copy Telegram Chat ID');
+        }
     };
 
     return (
@@ -196,20 +238,35 @@ function ClientRow({
                     </Button>
                 </TableCell>
                 <TableCell className="font-medium">
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={onToggle}
-                        disabled={client.configsCount === 0}
-                        className="flex items-center gap-2">
-                        <UserIcon className="h-4 w-4" />
-                        {client.name}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={onToggle}
+                            disabled={client.configsCount === 0}
+                            className="flex items-center gap-2 hover:bg-transparent">
+                            <UserIcon className="h-4 w-4" />
+                            {client.name}
+                        </Button>
+
                         {client.telegramId && (
-                            <Badge variant="outline" className="text-xs">
-                                {client.telegramId}
+                            <Badge
+                                variant="outline"
+                                className="cursor-pointer text-xs whitespace-nowrap"
+                                onClick={() => {
+                                    copyChatIdToClipboard(client.telegramId);
+                                }}>
+                                <div className="flex items-center gap-1">
+                                    <span>{client.telegramId}</span>
+                                    {copiedChatId ? (
+                                        <Check className="h-3 w-3" />
+                                    ) : (
+                                        <Copy className="h-3 w-3" />
+                                    )}
+                                </div>
                             </Badge>
                         )}
-                    </Button>
+                    </div>
                 </TableCell>
                 <TableCell>
                     <span className="text-muted-foreground">
@@ -220,17 +277,39 @@ function ClientRow({
                     <Badge variant="secondary">Client</Badge>
                 </TableCell>
                 <TableCell>{formatBytes(totalTraffic)}</TableCell>
-                <TableCell>—</TableCell>
                 <TableCell>
-                    <Button disabled={sendMessages.isPending} onClick={onSubmit}>
-                        {sendMessages.isPending && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
-                        {sendMessages.isPending ? 'Sending...' : 'Send configs'}
-                    </Button>
+                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' ? (
+                        <Button
+                            disabled={sendLinks.isPending}
+                            onClick={onSubmitLinks}
+                            variant="outline"
+                            size="sm">
+                            {sendLinks.isPending && (
+                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                            )}
+                            {sendLinks.isPending ? 'Sending...' : 'Send links'}
+                        </Button>
+                    ) : (
+                        '—'
+                    )}
                 </TableCell>
                 <TableCell>
-                    <div className="flex items-center gap-2">
+                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' ? (
+                        <Button
+                            disabled={sendConfigs.isPending}
+                            onClick={onSubmitConfigs}
+                            size="sm">
+                            {sendConfigs.isPending && (
+                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                            )}
+                            {sendConfigs.isPending ? 'Sending...' : 'Send configs'}
+                        </Button>
+                    ) : (
+                        '—'
+                    )}
+                </TableCell>
+                <TableCell>
+                    <div className="flex items-center justify-end gap-1">
                         <UpdateClientDialog
                             id={client.id}
                             name={client.name}
@@ -276,11 +355,10 @@ function ConfigRow({
 
     const sendMessage = api.configs.sendVpnKey.useMutation({
         onSuccess: () => {
-            toast.success('VPN config were sent successfully');
+            toast.success('VPN config was sent successfully');
         },
         onError: (error) => {
-            toast.error('Error sending config');
-            console.error(error);
+            telegramToastError(error);
         },
     });
 
@@ -316,20 +394,22 @@ function ConfigRow({
             <TableCell>{formatLastHandshake(config.lastHandshake)}</TableCell>
             <TableCell>{formatDate(NumberExpiresAt * 1000)}</TableCell>
             <TableCell>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center justify-end gap-2">
+                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' && (
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="cursor-pointer text-blue-400 hover:text-blue-600"
+                            onClick={onSubmit}
+                            disabled={sendMessage.isPending}>
+                            {sendMessage.isPending ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                                <Send className="h-4 w-4" />
+                            )}
+                        </Button>
+                    )}
                     <ConfigDialog config={config} />
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="cursor-pointer text-blue-400 hover:text-blue-600"
-                        onClick={onSubmit}
-                        disabled={sendMessage.isPending}>
-                        {sendMessage.isPending ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Send className="h-4 w-4" />
-                        )}
-                    </Button>
                     <DeleteConfigDialog id={config.id} protocol={config.protocol} />
                 </div>
             </TableCell>

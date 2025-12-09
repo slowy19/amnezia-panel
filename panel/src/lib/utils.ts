@@ -2,6 +2,7 @@ import { clsx, type ClassValue } from 'clsx';
 import type { LevelTypes, LogTypes, Protocols } from 'prisma/generated/enums';
 import { twMerge } from 'tailwind-merge';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 
 export function cn(...inputs: ClassValue[]) {
     return twMerge(clsx(inputs));
@@ -128,3 +129,14 @@ export const getLogTypeColor = (levelType: LogTypes) => {
             return 'bg-green-100 text-green-800';
     }
 };
+
+export function telegramToastError(error: any) {
+    if (error?.message?.includes('User has not started the bot or chat not found')) {
+        toast.error('User has not started the bot or chat not found');
+    } else if (error?.message?.includes('Bot was blocked by the user or user is deactivated')) {
+        toast.error('Bot was blocked by the user or user is deactivated');
+    } else {
+        toast.error('Error sending messages');
+        console.error(error);
+    }
+}

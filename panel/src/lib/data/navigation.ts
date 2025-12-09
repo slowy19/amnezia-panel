@@ -21,7 +21,7 @@ export const navigation: Navigation = {
             items: [
                 {
                     title: 'Clients table',
-                    url: '/',
+                    url: '/clients',
                 },
                 {
                     title: 'Create client',

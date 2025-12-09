@@ -19,8 +19,6 @@ export function SidebarBreadCrumbs() {
         .flatMap((el) => el.items)
         .find((el) => pathname.startsWith(el.url));
 
-    const foundActiveSection = navigation.navMain.find((el) => pathname.startsWith(el.url));
-
     return (
         <header className="mb-5 flex h-16 w-full shrink-0 items-center gap-2 border-b px-4">
             <SidebarTrigger className="-ml-1" />
@@ -29,15 +27,7 @@ export function SidebarBreadCrumbs() {
                 <Breadcrumb>
                     <BreadcrumbList>
                         <BreadcrumbItem>
-                            {foundActivePage ? (
-                                <BreadcrumbLink
-                                    href={foundActiveSection?.url}
-                                    className="hover:underline">
-                                    {foundActiveSection?.title}
-                                </BreadcrumbLink>
-                            ) : (
-                                <BreadcrumbPage>{foundActiveSection?.title}</BreadcrumbPage>
-                            )}
+                            <BreadcrumbPage>{foundActivePage?.title}</BreadcrumbPage>
                         </BreadcrumbItem>
                     </BreadcrumbList>
                 </Breadcrumb>

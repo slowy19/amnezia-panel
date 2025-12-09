@@ -28,24 +28,34 @@ class TelegramService {
         return new Promise((resolve) => setTimeout(resolve, ms));
     }
 
-    private getTelegramErrorCode(description: string): TRPC_ERROR_CODE_KEY {
-        if (
-            description.includes('bot was blocked by the user') ||
-            description.includes('user is deactivated') ||
-            description.includes('bot was kicked')
-        ) {
+    private getTrpcErrorCodeFromTelegram(
+        description: string,
+        errorCode?: number
+    ): TRPC_ERROR_CODE_KEY {
+        // Telegram возвращает конкретные коды ошибок:
+        // 403 - бот заблокирован/кикнут
+        // 400 - чат не найден/пользователь не стартовал бота
+
+        if (errorCode === 403) {
             return 'FORBIDDEN';
         }
 
-        if (description.includes('chat not found') || description.includes('user not found')) {
-            return 'NOT_FOUND';
+        if (errorCode === 400) {
+            if (
+                description.includes('chat not found') ||
+                description.includes('user not found') ||
+                description.includes('PEER_ID_INVALID')
+            ) {
+                return 'NOT_FOUND'; // Пользователь не стартовал бота
+            }
+            return 'BAD_REQUEST';
         }
 
         if (description.includes('Too Many Requests')) {
             return 'TOO_MANY_REQUESTS';
         }
 
-        return 'BAD_REQUEST';
+        return 'INTERNAL_SERVER_ERROR';
     }
 
     private async makeRequestWithRetry<T>(
@@ -66,48 +76,33 @@ class TelegramService {
                 };
 
                 const response = await fetch(url, fetchOptions);
-
-                if (!response.ok) {
-                    if (response.status === 429) {
-                        const retryAfter = response.headers.get('Retry-After');
-                        const delay = retryAfter
-                            ? Number(retryAfter) * 1000
-                            : this.retryDelay * attempt;
-                        await this.sleep(delay);
-                        continue;
-                    }
-
-                    throw new TRPCError({
-                        code: getTrpcErrorCode(response.status),
-                        message: `Telegram API error: ${response.statusText}`,
-                    });
-                }
-
                 const data = await response.json();
 
+                // Telegram всегда возвращает 200 OK, даже при ошибках
+                // Проверяем поле ok в ответе
                 if (!data.ok) {
-                    const errorCode = this.getTelegramErrorCode(data.description || '');
+                    const errorCode = data.error_code || 500;
+                    const description = data.description || 'Unknown Telegram error';
 
-                    if (
-                        data.description?.includes('bot was blocked by the user') ||
-                        data.description?.includes('bot was kicked')
-                    ) {
-                        throw new TRPCError({
-                            code: errorCode,
-                            message: 'Bot was blocked by client',
-                        });
-                    }
+                    const trpcErrorCode = this.getTrpcErrorCodeFromTelegram(description, errorCode);
 
-                    if (data.description?.includes('chat not found')) {
-                        throw new TRPCError({
-                            code: errorCode,
-                            message: 'Client not started a bot',
-                        });
+                    let userMessage = description;
+
+                    if (errorCode === 403) {
+                        userMessage = 'Bot was blocked by the user or user is deactivated';
+                    } else if (errorCode === 400) {
+                        if (
+                            description.includes('chat not found') ||
+                            description.includes('user not found') ||
+                            description.includes('PEER_ID_INVALID')
+                        ) {
+                            userMessage = 'User has not started the bot or chat not found';
+                        }
                     }
 
                     throw new TRPCError({
-                        code: errorCode,
-                        message: `Telegram API returned error: ${data.description}`,
+                        code: trpcErrorCode,
+                        message: userMessage,
                     });
                 }
 

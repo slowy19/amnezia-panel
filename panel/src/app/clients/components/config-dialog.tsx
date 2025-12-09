@@ -101,7 +101,7 @@ export function ConfigDialog({ config }: ConfigInfoDialogProps) {
 
     const updateConfigClient = api.configs.updateClientConfig.useMutation({
         onSuccess: () => {
-            toast.success('Client updated successfully');
+            toast.success('Client was updated successfully');
             utils.clients.getClientsWithConfigs.invalidate();
             setOpen(false);
         },
