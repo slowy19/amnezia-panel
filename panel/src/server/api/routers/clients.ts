@@ -384,7 +384,7 @@ Download the app for your platform:
 • <b>Linux docs:</b> https://docs.amnezia.org/documentation/installing-app-on-linux
 
 <b>📱 Smartphones & Tablets</b>
-• <b>Android:</b> https://amnezia.org/img/en/dwn-play.png
+• <b>Android:</b> https://play.google.com/store/apps/details?id=org.amnezia.vpn
 • <b>iPhone / iPad:</b> https://apps.apple.com/us/app/amneziavpn/id1600529900`;
 
             await telegramService.sendMessage({
