@@ -8,6 +8,7 @@ import type {
     MessageResponse,
     Protocol,
     ServerBackup,
+    ServerBackupZod,
 } from '../interfaces/amnezia-api';
 
 interface UniversalResponse {
@@ -314,7 +315,7 @@ class AmneziaApiService {
         }
     }
 
-    async importServerBackup(body: ServerBackup): Promise<ServerBackup> {
+    async importServerBackup(body: ServerBackupZod): Promise<ServerBackup> {
         try {
             return await this.makeRequestWithRetry<ServerBackup>(
                 'server/backup',

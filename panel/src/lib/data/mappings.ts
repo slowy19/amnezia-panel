@@ -10,8 +10,13 @@ export const protocolsApiMapping: Record<Protocols, 'amneziawg' | 'xray'> = {
     [Protocols.XRAY]: 'xray',
 };
 
+export const protocolsServerMapping: Record<string, string> = {
+    amneziawg: 'AmneziaWG',
+    xray: 'XRAY',
+};
+
 export const apiProtocolsMapping: Record<'amneziawg' | 'xray', Protocols> = {
-    ['amneziawg']: Protocols.AMNEZIAWG ,
+    ['amneziawg']: Protocols.AMNEZIAWG,
     ['xray']: Protocols.XRAY,
 };
 
