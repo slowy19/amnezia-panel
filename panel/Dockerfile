@@ -12,6 +12,8 @@ RUN yarn build
 
 FROM node:24-alpine
 
+RUN apk add --no-cache nginx netcat-openbsd
+
 WORKDIR /app
 
 COPY --from=builder /app/.next /app/.next
@@ -20,6 +22,8 @@ COPY --from=builder /app/package.json /app/package.json
 COPY --from=builder /app/public /app/public
 COPY --from=builder /app/nginx.conf /etc/nginx/nginx.conf
 COPY --from=builder /app/prisma /app/prisma
+COPY --from=builder /app/prisma.config.ts /app/prisma.config.ts
+COPY --from=builder /app/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
 EXPOSE 8443

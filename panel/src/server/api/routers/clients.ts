@@ -376,14 +376,14 @@ Expiration date: <b>${expiryDate}</b>
             const message = `For using <b>${process.env.NEXT_PUBLIC_VPN_NAME}</b> you need download the open-source AmneziaVPN app.
 
 <b>💻 Computers & Laptops</b>
-• <b>Windows:</b> https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.10.0/AmneziaVPN_4.8.10.0_windows_x64.exe
-• <b>macOS:</b> https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.10.0/AmneziaVPN_4.8.10.0_macos.zip
-• <b>Linux:</b> https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.10.0/AmneziaVPN_4.8.10.0_linux_x64.tar.zip
-• <b>Linux docs:</b> https://docs.amnezia.org/documentation/installing-app-on-linux
+• <a href="https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.11.4/AmneziaVPN_4.8.11.4_x64.exe">Windows</a> 
+• <a href="https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.11.4/AmneziaVPN_4.8.11.4_macos.zip">macOS</a> 
+• <a href="https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.11.4/AmneziaVPN_4.8.11.4_linux_x64.tar.zip">Linux</a>
+• <a href="https://docs.amnezia.org/documentation/installing-app-on-linux">Linux docs</a>
 
 <b>📱 Smartphones & Tablets</b>
-• <b>Android:</b> https://play.google.com/store/apps/details?id=org.amnezia.vpn
-• <b>iPhone / iPad:</b> https://apps.apple.com/us/app/amneziavpn/id1600529900`;
+• <a href="https://play.google.com/store/apps/details?id=org.amnezia.vpn">Android</a>
+• <a href="https://apps.apple.com/us/app/amneziavpn/id1600529900">iPhone / iPad</a>`;
 
             await telegramService.sendMessage({
                 chatId: foundClient.telegramId,
