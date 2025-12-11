@@ -375,8 +375,6 @@ Expiration date: <b>${expiryDate}</b>
 
             const message = `For using <b>${process.env.NEXT_PUBLIC_VPN_NAME}</b> you need download the open-source AmneziaVPN app.
 
-Download the app for your platform:
-
 <b>💻 Computers & Laptops</b>
 • <b>Windows:</b> https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.10.0/AmneziaVPN_4.8.10.0_windows_x64.exe
 • <b>macOS:</b> https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.10.0/AmneziaVPN_4.8.10.0_macos.zip
