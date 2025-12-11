@@ -1,0 +1,38 @@
+services:
+    app:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        container_name: app-amnezia-panel
+        ports:
+            - "8443:8443"
+        volumes:
+            - ./certs/selfsigned.crt:/etc/ssl/certs/selfsigned.crt:ro
+            - ./certs/selfsigned.key:/etc/ssl/private/selfsigned.key:ro
+        env_file:
+            - .env
+        depends_on:
+            - db
+        healthcheck:
+            test: ["CMD", "pg_isready", "-U", "${DB_USER}", "-d", "${DB_NAME}"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+
+    db:
+        image: postgres:17
+        container_name: db-amnezia-panel
+        environment:
+            POSTGRES_USER: ${DB_USER}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_DB: ${DB_NAME}
+        volumes:
+            - db_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+            interval: 5s
+            timeout: 5s
+            retries: 10
+
+volumes:
+    db_data:
