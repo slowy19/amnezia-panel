@@ -374,7 +374,7 @@ Expiration date: <b>${expiryDate}</b>
             if (!foundClient?.telegramId)
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'Client not found' });
 
-            const message = `For using <b>${process.env.NEXT_PUBLIC_VPN_NAME}</b> you need download the open-source AmneziaVPN app.
+            const message = `For using <b>${process.env.NEXT_PUBLIC_VPN_NAME}</b> you need to download the open-source AmneziaVPN app.
 
 <b>💻 Computers & Laptops</b>
 • <a href="https://github.com/amnezia-vpn/amnezia-client/releases/download/4.8.11.4/AmneziaVPN_4.8.11.4_x64.exe">Windows</a> 
