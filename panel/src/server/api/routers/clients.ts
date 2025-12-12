@@ -178,6 +178,7 @@ export const clientsRouter = createTRPCRouter({
                     username: config.username,
                     vpnKey: encryptedVpnKey,
                     protocol: config.protocol,
+                    expiresAt: config.expiresAt,
                     clientId: createdClient.id,
                 },
             });
