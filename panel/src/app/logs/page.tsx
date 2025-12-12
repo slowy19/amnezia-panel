@@ -31,7 +31,7 @@ import { PopoverMessage } from '@/components/popover-message';
 const optionsLevelTypes = [
     {
         value: 'All',
-        label: 'Все',
+        label: 'All',
     },
     {
         value: LevelTypes.INFO,
@@ -50,7 +50,7 @@ const optionsLevelTypes = [
 const optionsLogTypes = [
     {
         value: 'All',
-        label: 'Все',
+        label: 'All',
     },
     {
         value: LogTypes.TELEGRAM,
