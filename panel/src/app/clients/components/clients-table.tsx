@@ -28,7 +28,6 @@ import {
     getProtocolColor,
     telegramToastError,
 } from '@/lib/utils';
-import Link from 'next/link';
 import type { Protocols } from 'prisma/generated/enums';
 import { UpdateClientDialog } from './client-dialog';
 import DeleteClientDialog from './delete-client-dialog';
@@ -395,7 +394,7 @@ function ConfigRow({
             <TableCell>{formatDate(NumberExpiresAt * 1000)}</TableCell>
             <TableCell>
                 <div className="flex items-center justify-end gap-2">
-                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' && (
+                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' && isNested && (
                         <Button
                             variant="ghost"
                             size="sm"

@@ -10,8 +10,8 @@ import { encryptionService } from '@/server/services/encryption';
 import type { IDevice } from '@/server/interfaces/amnezia-api';
 import { logsService } from '@/server/services/logs';
 import { TRPCError } from '@trpc/server';
-import { telegramService } from '@/server/services/telegram';
-import { format } from 'date-fns';
+import { sendConfigsToTelegram } from '@/server/services/telegram/telegram-messages';
+import { telegramService } from '@/server/services/telegram/telegram';
 
 export const clientsRouter = createTRPCRouter({
     getClients: publicProcedure.query(async ({ ctx }) => {
@@ -29,22 +29,31 @@ export const clientsRouter = createTRPCRouter({
         .query(async ({ ctx, input }) => {
             const { search, protocolFilter } = input;
 
-            const whereConditions: Prisma.ConfigsWhereInput = {
-                username: search
-                    ? {
-                          contains: search,
-                          mode: 'insensitive',
-                      }
-                    : undefined,
-            };
+            const apiConfigs = await amneziaApiService.getConfigs();
 
-            if (protocolFilter && protocolFilter !== 'All') {
-                whereConditions.protocol = protocolFilter;
+            const apiDevicesMap = new Map<string, IDevice>();
+            const apiDevices: Array<{
+                id: string;
+                username: string;
+                device: IDevice;
+            }> = [];
+
+            for (const user of apiConfigs.items) {
+                for (const device of user.devices) {
+                    apiDevicesMap.set(device.id, device);
+                    apiDevices.push({
+                        id: device.id,
+                        username: user.username,
+                        device: device,
+                    });
+                }
             }
 
-            const [configs, clients, apiConfigs] = await Promise.all([
+            const baseWhereConditions: Prisma.ConfigsWhereInput = {};
+
+            const [configsFromDb, clients] = await Promise.all([
                 ctx.db.configs.findMany({
-                    where: whereConditions,
+                    where: baseWhereConditions,
                     select: {
                         id: true,
                         createdAt: true,
@@ -64,31 +73,14 @@ export const clientsRouter = createTRPCRouter({
                         createdAt: true,
                         name: true,
                         telegramId: true,
-                        _count: {
-                            select: {
-                                Configs: {
-                                    where: whereConditions,
-                                },
-                            },
-                        },
                     },
                     orderBy: {
                         name: 'asc',
                     },
                 }),
-
-                amneziaApiService.getConfigs(),
             ]);
 
-            const apiDevicesMap = new Map<string, IDevice>();
-
-            for (const user of apiConfigs.items) {
-                for (const device of user.devices) {
-                    apiDevicesMap.set(device.id, device);
-                }
-            }
-
-            const mergedConfigs = configs.map((config) => {
+            const mergedConfigs = configsFromDb.map((config) => {
                 const apiDevice = apiDevicesMap.get(config.id);
 
                 if (apiDevice) {
@@ -101,9 +93,7 @@ export const clientsRouter = createTRPCRouter({
                         endpoint: apiDevice.endpoint,
                         expiresAt: String(apiDevice.expiresAt) || config.expiresAt,
                         protocol: apiProtocolsMapping[apiDevice.protocol],
-                        username: config.username,
-                        createdAt: config.createdAt,
-                        clientId: config.clientId,
+                        source: 'db',
                     };
                 }
 
@@ -114,48 +104,79 @@ export const clientsRouter = createTRPCRouter({
                     traffic: { received: 0, sent: 0 },
                     allowedIps: [],
                     endpoint: null,
+                    source: 'db',
                 };
             });
 
-            const dbConfigIds = new Set(configs.map((c) => c.id));
+            const dbConfigIds = new Set(configsFromDb.map((c) => c.id));
 
-            for (const user of apiConfigs.items) {
-                for (const device of user.devices) {
-                    if (!dbConfigIds.has(device.id)) {
-                        mergedConfigs.push({
-                            id: device.id,
-                            createdAt: new Date(),
-                            username: user.username,
-                            expiresAt: device.expiresAt ? String(device.expiresAt) : null,
-                            protocol: apiProtocolsMapping[device.protocol],
-                            clientId: null,
-                            online: device.online,
-                            lastHandshake: String(device.lastHandshake),
-                            traffic: device.traffic,
-                            allowedIps: device.allowedIps,
-                            endpoint: device.endpoint,
-                        });
-                    }
+            for (const apiDevice of apiDevices) {
+                if (!dbConfigIds.has(apiDevice.id)) {
+                    mergedConfigs.push({
+                        id: apiDevice.id,
+                        createdAt: new Date(),
+                        username: apiDevice.username,
+                        expiresAt: apiDevice.device.expiresAt
+                            ? String(apiDevice.device.expiresAt)
+                            : null,
+                        protocol: apiProtocolsMapping[apiDevice.device.protocol],
+                        clientId: null,
+                        online: apiDevice.device.online,
+                        lastHandshake: String(apiDevice.device.lastHandshake),
+                        traffic: apiDevice.device.traffic,
+                        allowedIps: apiDevice.device.allowedIps,
+                        endpoint: apiDevice.device.endpoint,
+                        source: 'api',
+                    });
                 }
             }
 
-            const clientsWithConfigs = clients.map((client) => ({
-                id: client.id,
-                createdAt: client.createdAt,
-                name: client.name,
-                telegramId: client.telegramId,
-                configs: mergedConfigs.filter((config) => config.clientId === client.id),
-                configsCount: client._count.Configs,
-            }));
+            let filteredConfigs = mergedConfigs;
 
-            const orphanConfigs = mergedConfigs.filter((config) => !config.clientId);
+            if (search) {
+                const searchLower = search.toLowerCase();
+                filteredConfigs = filteredConfigs.filter((config) =>
+                    config.username.toLowerCase().includes(searchLower)
+                );
+            }
+
+            if (protocolFilter && protocolFilter !== 'All') {
+                filteredConfigs = filteredConfigs.filter(
+                    (config) => config.protocol === protocolFilter
+                );
+            }
+
+            const configsByClientId = new Map<string, typeof filteredConfigs>();
+            for (const config of filteredConfigs) {
+                const clientId = String(config.clientId);
+                if (clientId) {
+                    if (!configsByClientId.has(clientId)) {
+                        configsByClientId.set(clientId, []);
+                    }
+                    configsByClientId.get(clientId)!.push(config);
+                }
+            }
+
+            const clientsWithConfigs = clients.map((client) => {
+                const clientConfigs = configsByClientId.get(String(client.id)) || [];
+                return {
+                    id: client.id,
+                    createdAt: client.createdAt,
+                    name: client.name,
+                    telegramId: client.telegramId,
+                    configs: clientConfigs,
+                    configsCount: clientConfigs.length,
+                };
+            });
+
+            const orphanConfigs = filteredConfigs.filter((config) => !config.clientId);
 
             return {
                 clients: clientsWithConfigs,
                 orphanConfigs,
             };
         }),
-
+        
     createClient: publicProcedure.input(createClientSchema).mutation(async ({ ctx, input }) => {
         const { name, telegramId, configs } = input;
 
@@ -265,34 +286,11 @@ export const clientsRouter = createTRPCRouter({
                 });
             }
 
-            const messages = foundClient.Configs.map((config) => {
-                const decryptedVpnKey = encryptionService.decryptField(config.vpnKey);
-                const expiryDate = config.expiresAt
-                    ? format(new Date(Number(config.expiresAt) * 1000), 'MM/dd/yyyy')
-                    : 'Not set';
-
-                return `
-Configuration for <b>${config.username.startsWith(foundClient.name) ? config.username.split('-')[1] : config.username}</b>
-Protocol: <b>${protocolsMapping[config.protocol] || 'Not specified'}</b>
-Expiration date: <b>${expiryDate}</b>
-<code>${decryptedVpnKey}</code>
-─────────────────────`;
-            });
-
-            const header = `🔐 <b>VPN configurations from ${process.env.NEXT_PUBLIC_VPN_NAME}</b>\n\n`;
-            const footer = `\n\n📦 Total configurations: ${foundClient.Configs.length}`;
-
-            const fullMessage = header + messages.join('\n') + footer;
-
-            if (fullMessage.length > 4096) {
-                await telegramService.sendInParts(foundClient.telegramId, fullMessage, footer);
-            } else {
-                await telegramService.sendMessage({
-                    chatId: foundClient.telegramId,
-                    text: fullMessage,
-                    parseMode: 'HTML',
-                });
-            }
+            await sendConfigsToTelegram(
+                foundClient.name,
+                foundClient.telegramId,
+                foundClient.Configs
+            );
 
             await logsService.createLog(
                 'TELEGRAM',
@@ -329,34 +327,11 @@ Expiration date: <b>${expiryDate}</b>
                 continue;
             }
 
-            const messages = foundClient.Configs.map((config) => {
-                const decryptedVpnKey = encryptionService.decryptField(config.vpnKey);
-                const expiryDate = config.expiresAt
-                    ? format(new Date(Number(config.expiresAt) * 1000), 'MM/dd/yyyy')
-                    : 'Not set';
-
-                return `
-Configuration for <b>${config.username.startsWith(foundClient.name) ? config.username.split('-')[1] : config.username}</b>
-Protocol: <b>${protocolsMapping[config.protocol] || 'Not specified'}</b>
-Expiration date: <b>${expiryDate}</b>
-<code>${decryptedVpnKey}</code>
-─────────────────────`;
-            });
-
-            const header = `🔐 <b>VPN configurations from ${process.env.NEXT_PUBLIC_VPN_NAME}</b>\n\n`;
-            const footer = `\n\n📦 Total configurations: ${foundClient.Configs.length}`;
-
-            const fullMessage = header + messages.join('\n') + footer;
-
-            if (fullMessage.length > 4096) {
-                await telegramService.sendInParts(foundClient.telegramId, fullMessage, footer);
-            } else {
-                await telegramService.sendMessage({
-                    chatId: foundClient.telegramId,
-                    text: fullMessage,
-                    parseMode: 'HTML',
-                });
-            }
+            await sendConfigsToTelegram(
+                foundClient.name,
+                foundClient.telegramId,
+                foundClient.Configs
+            );
         }
 
         await logsService.createLog('TELEGRAM', 'INFO', `VPN keys sent for clients`);
@@ -386,12 +361,19 @@ Expiration date: <b>${expiryDate}</b>
 • <a href="https://play.google.com/store/apps/details?id=org.amnezia.vpn">Android</a>
 • <a href="https://apps.apple.com/us/app/amneziavpn/id1600529900">iPhone / iPad</a>`;
 
-            await telegramService.sendMessage({
-                chatId: foundClient.telegramId,
-                text: message,
-                parseMode: 'HTML',
-            });
+            await telegramService.sendMessage(
+                {
+                    chatId: foundClient.telegramId,
+                    text: message,
+                    parseMode: 'HTML',
+                },
+                foundClient.name
+            );
 
-            await logsService.createLog('TELEGRAM', 'INFO', `Links sent for client ${foundClient.name}`)
+            await logsService.createLog(
+                'TELEGRAM',
+                'INFO',
+                `Links sent for client ${foundClient.name}`
+            );
         }),
 });

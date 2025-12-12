@@ -105,7 +105,7 @@ export default function ServerActions() {
                     <p className="mb-1 font-medium">Notes:</p>
                     <ul className="list-inside list-disc space-y-1">
                         <li>Load backup downloads the current server backup</li>
-                        <li>Import backup uploads a new backup file</li>
+                        <li>Import backup uploads a new configuration to the AmneziaVPN server</li>
                         <li>Reboot server restarts the AmneziaVPN server</li>
                     </ul>
                 </div>

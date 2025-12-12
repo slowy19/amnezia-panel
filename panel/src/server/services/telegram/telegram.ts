@@ -1,7 +1,6 @@
-import { getTrpcErrorCode } from '@/lib/utils';
+import type { SendMessageParams, TelegramMessageResponse } from '@/server/interfaces/telegram';
 import { TRPCError, type TRPC_ERROR_CODE_KEY } from '@trpc/server';
-import type { SendMessageParams, TelegramMessageResponse } from '../interfaces/telegram';
-import { logsService } from './logs';
+import { logsService } from '../logs';
 
 class TelegramService {
     private readonly baseUrl: string;
@@ -32,10 +31,6 @@ class TelegramService {
         description: string,
         errorCode?: number
     ): TRPC_ERROR_CODE_KEY {
-        // Telegram возвращает конкретные коды ошибок:
-        // 403 - бот заблокирован/кикнут
-        // 400 - чат не найден/пользователь не стартовал бота
-
         if (errorCode === 403) {
             return 'FORBIDDEN';
         }
@@ -46,7 +41,7 @@ class TelegramService {
                 description.includes('user not found') ||
                 description.includes('PEER_ID_INVALID')
             ) {
-                return 'NOT_FOUND'; // Пользователь не стартовал бота
+                return 'NOT_FOUND';
             }
             return 'BAD_REQUEST';
         }
@@ -78,8 +73,6 @@ class TelegramService {
                 const response = await fetch(url, fetchOptions);
                 const data = await response.json();
 
-                // Telegram всегда возвращает 200 OK, даже при ошибках
-                // Проверяем поле ok в ответе
                 if (!data.ok) {
                     const errorCode = data.error_code || 500;
                     const description = data.description || 'Unknown Telegram error';
@@ -129,7 +122,7 @@ class TelegramService {
         });
     }
 
-    async sendMessage(params: SendMessageParams): Promise<TelegramMessageResponse> {
+    async sendMessage(params: SendMessageParams, clientName: string): Promise<TelegramMessageResponse> {
         try {
             return await this.makeRequestWithRetry<TelegramMessageResponse>(
                 'sendMessage',
@@ -148,7 +141,7 @@ class TelegramService {
             await logsService.createLog(
                 'TELEGRAM',
                 'ERROR',
-                `Failed to send Telegram message: ${error instanceof TRPCError || error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to send Telegram message for client ${clientName}: ${error instanceof TRPCError || error instanceof Error ? error.message : 'Unknown error'}`
             );
 
             if (error instanceof TRPCError) {
@@ -157,56 +150,8 @@ class TelegramService {
 
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
-                message: `Failed to send Telegram message: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                message: `Failed to send Telegram message for client ${clientName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
             });
-        }
-    }
-
-    async sendInParts(chatId: string, fullMessage: string, footer: string) {
-        const MAX_LENGTH = 4096;
-        const PART_SEPARATOR = '\n\n--- Continued ---\n\n';
-
-        let remainingText = fullMessage;
-        let partNumber = 1;
-
-        while (remainingText.length > 0) {
-            let currentPart = partNumber === 1 ? '' : `📄 Part ${partNumber}\n\n`;
-
-            const availableChars =
-                MAX_LENGTH - currentPart.length - (partNumber > 1 ? PART_SEPARATOR.length : 0);
-            const textToTake = Math.min(availableChars, remainingText.length);
-
-            let textPart = remainingText.substring(0, textToTake);
-
-            const lastNewLine = textPart.lastIndexOf('\n');
-            if (lastNewLine > textToTake - 100 && lastNewLine > 0) {
-                textPart = textPart.substring(0, lastNewLine);
-            }
-
-            if (partNumber > 1) {
-                textPart = PART_SEPARATOR + textPart;
-            }
-
-            textPart = currentPart + textPart;
-
-            if (remainingText.length - textPart.length + currentPart.length <= 0) {
-                textPart += footer;
-            }
-
-            await this.sendMessage({
-                chatId: chatId,
-                text: textPart,
-                parseMode: 'HTML',
-            });
-
-            remainingText = remainingText.substring(
-                textPart.length - currentPart.length - (partNumber > 1 ? PART_SEPARATOR.length : 0)
-            );
-            partNumber++;
-
-            if (remainingText.length > 0) {
-                await new Promise((resolve) => setTimeout(resolve, 500));
-            }
         }
     }
 
@@ -217,7 +162,7 @@ class TelegramService {
         parseMode?: 'HTML' | 'Markdown' | 'MarkdownV2';
         disableNotification?: boolean;
         replyToMessageId?: number;
-    }): Promise<any> {
+    }, clientName: string): Promise<any> {
         try {
             return await this.makeRequestWithRetry('sendDocument', this.getFetchOptions(), {
                 chat_id: params.chatId,
@@ -231,7 +176,7 @@ class TelegramService {
             await logsService.createLog(
                 'TELEGRAM',
                 'ERROR',
-                `Failed to send document: ${error instanceof TRPCError || error instanceof Error ? error.message : 'Unknown error'}`
+                `Failed to send document for client ${clientName}: ${error instanceof TRPCError || error instanceof Error ? error.message : 'Unknown error'}`
             );
 
             if (error instanceof TRPCError) {
@@ -240,7 +185,7 @@ class TelegramService {
 
             throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
-                message: `Failed to send document: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                message: `Failed to send document for client ${clientName}: ${error instanceof Error ? error.message : 'Unknown error'}`,
             });
         }
     }

@@ -9,7 +9,7 @@ import { TRPCError } from '@trpc/server';
 import { logsService } from '@/server/services/logs';
 import { Protocols } from 'prisma/generated/enums';
 import { format } from 'date-fns';
-import { telegramService } from '@/server/services/telegram';
+import { telegramService } from '@/server/services/telegram/telegram';
 
 export const configsRouter = createTRPCRouter({
     createConfig: publicProcedure.input(createConfigSchema).mutation(async ({ ctx, input }) => {
@@ -131,15 +131,14 @@ Protocol: <b>${protocolsMapping[foundConfig.protocol] || 'Not specified'}</b>
 Expiration date: <b>${expiryDate}</b>
 <code>${decryptedVpnKey}</code>`;
 
-            if (message.length > 4096) {
-                await telegramService.sendInParts(foundConfig.Clients.telegramId, message, '');
-            } else {
-                await telegramService.sendMessage({
+            await telegramService.sendMessage(
+                {
                     chatId: foundConfig.Clients.telegramId,
                     text: message,
                     parseMode: 'HTML',
-                });
-            }
+                },
+                foundConfig.Clients.name
+            );
 
             await logsService.createLog(
                 'TELEGRAM',
