@@ -127,9 +127,34 @@ add_cron_job() {
     crontab -l 2>/dev/null | grep -E "(backup|$project_path)" || echo "  (no backup-related cron jobs found)"
 }
 
+install_nodejs() {
+  
+    if ! command -v node >/dev/null 2>&1; then
+        if ! command -v curl >/dev/null 2>&1; then
+            apt-get update -y
+            apt-get install -y curl
+        fi
+
+        print_message "Installing NodeJS and yarn..."
+
+        curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s lts
+        hash -r
+    fi
+  
+    node -v && npm -v
+  
+    if ! command -v yarn >/dev/null 2>&1; then
+        npm install -g yarn
+    fi
+  
+    yarn -v
+}
+
 main() {
     PROJECT_ROOT=$(get_project_root)
     cd "$PROJECT_ROOT"
+
+    install_nodejs
     
     print_message "Starting deployment of AmneziaVPN Panel"
     
