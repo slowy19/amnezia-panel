@@ -36,6 +36,7 @@ import DeleteConfigDialog from './delete-config-dialog';
 import { ConfigDialog } from './config-dialog';
 import { api } from '@/trpc/react';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ConfigsWithClientsProps {
     clients: Array<{
@@ -277,32 +278,46 @@ function ClientRow({
                 </TableCell>
                 <TableCell>{formatBytes(totalTraffic)}</TableCell>
                 <TableCell>
-                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' ? (
-                        <Button
-                            disabled={sendLinks.isPending}
-                            onClick={onSubmitLinks}
-                            variant="outline"
-                            size="sm">
-                            {sendLinks.isPending && (
-                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                            )}
-                            {sendLinks.isPending ? 'Sending...' : 'Send links'}
-                        </Button>
+                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' && client.telegramId ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    disabled={sendLinks.isPending}
+                                    onClick={onSubmitLinks}
+                                    variant="outline"
+                                    size="sm">
+                                    {sendLinks.isPending && (
+                                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                    )}
+                                    {sendLinks.isPending ? 'Sending...' : 'Send links'}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Send AmneziaVPN links to Telegram</p>
+                            </TooltipContent>
+                        </Tooltip>
                     ) : (
                         '—'
                     )}
                 </TableCell>
                 <TableCell>
-                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' ? (
-                        <Button
-                            disabled={sendConfigs.isPending}
-                            onClick={onSubmitConfigs}
-                            size="sm">
-                            {sendConfigs.isPending && (
-                                <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                            )}
-                            {sendConfigs.isPending ? 'Sending...' : 'Send configs'}
-                        </Button>
+                    {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' && client.telegramId ? (
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    disabled={sendConfigs.isPending}
+                                    onClick={onSubmitConfigs}
+                                    size="sm">
+                                    {sendConfigs.isPending && (
+                                        <Loader2 className="mr-2 h-3 w-3 animate-spin" />
+                                    )}
+                                    {sendConfigs.isPending ? 'Sending...' : 'Send configs'}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Send client configs to Telegram</p>
+                            </TooltipContent>
+                        </Tooltip>
                     ) : (
                         '—'
                     )}
@@ -395,18 +410,25 @@ function ConfigRow({
             <TableCell>
                 <div className="flex items-center justify-end gap-2">
                     {process.env.NEXT_PUBLIC_USES_TELEGRAM_BOT === 'true' && isNested && (
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="cursor-pointer text-blue-400 hover:text-blue-600"
-                            onClick={onSubmit}
-                            disabled={sendMessage.isPending}>
-                            {sendMessage.isPending ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                                <Send className="h-4 w-4" />
-                            )}
-                        </Button>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="cursor-pointer text-blue-400 hover:text-blue-600"
+                                    onClick={onSubmit}
+                                    disabled={sendMessage.isPending}>
+                                    {sendMessage.isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Send className="h-4 w-4" />
+                                    )}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                                <p>Send config to Telegram</p>
+                            </TooltipContent>
+                        </Tooltip>
                     )}
                     <ConfigDialog config={config} />
                     <DeleteConfigDialog id={config.id} protocol={config.protocol} />

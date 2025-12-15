@@ -26,6 +26,7 @@ import { Loader2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/trpc/react';
 import { updateClientSchema, type updateClientFormData } from '@/lib/schemas/clients';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
     id?: number;
@@ -77,9 +78,16 @@ export function UpdateClientDialog({ id, name, telegramId }: Props) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="cursor-pointer">
-                    <Edit className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="cursor-pointer">
+                            <Edit className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Edit client</p>
+                    </TooltipContent>
+                </Tooltip>
             </DialogTrigger>
             <DialogContent className="sm:max-w-[525px]">
                 <DialogHeader>

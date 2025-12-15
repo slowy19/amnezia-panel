@@ -16,6 +16,7 @@ import { useState } from 'react';
 import { api } from '@/trpc/react';
 import { toast } from 'sonner';
 import type { Protocols } from 'prisma/generated/enums';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
     id: string;
@@ -44,13 +45,21 @@ export default function DeleteConfigDialog({ id, protocol }: Readonly<Props>) {
 
     return (
         <>
-            <Button
-                variant="ghost"
-                size="sm"
-                className="cursor-pointer text-red-400 hover:text-red-600"
-                onClick={() => setIsDelete(true)}>
-                <Trash2 className="h-4 w-4" />
-            </Button>
+            <Tooltip>
+                <TooltipTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="cursor-pointer text-red-400 hover:text-red-600"
+                        onClick={() => setIsDelete(true)}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Delete config</p>
+                </TooltipContent>
+            </Tooltip>
+
             <AlertDialog open={isDelete} onOpenChange={setIsDelete}>
                 <AlertDialogContent>
                     <AlertDialogHeader>

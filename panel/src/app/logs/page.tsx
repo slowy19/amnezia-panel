@@ -110,6 +110,9 @@ export default function LogsPage() {
                     <CardDescription>Logs count: {data?.totalItems}</CardDescription>
                 </CardHeader>
                 <CardContent>
+                    <p className="text-muted-foreground mb-2">
+                        Note: Click on the message to open the log
+                    </p>
                     <div className="grid gap-6">
                         <div className="flex items-center gap-4">
                             <InputSearchLoader
@@ -152,7 +155,6 @@ export default function LogsPage() {
                                 </Select>
                             </div>
                         </div>
-
                         {isLoading ? (
                             <Loader />
                         ) : error ? (

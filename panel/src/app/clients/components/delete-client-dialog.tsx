@@ -15,6 +15,7 @@ import { Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { api } from '@/trpc/react';
 import { toast } from 'sonner';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface Props {
     id: number;
@@ -42,14 +43,22 @@ export default function DeleteClientDialog({ id }: Readonly<Props>) {
 
     return (
         <>
-            <Button
+        <Tooltip>
+                <TooltipTrigger asChild>
+                     <Button
                 variant="ghost"
                 size="sm"
                 className="cursor-pointer text-red-400 hover:text-red-600"
                 onClick={() => setIsDelete(true)}>
                 <Trash2 className="h-4 w-4" />
             </Button>
-            <AlertDialog open={isDelete} onOpenChange={setIsDelete}>
+                </TooltipTrigger>
+                <TooltipContent>
+                    <p>Delete client</p>
+                </TooltipContent>
+            </Tooltip>
+
+                       <AlertDialog open={isDelete} onOpenChange={setIsDelete}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>

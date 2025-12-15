@@ -39,6 +39,7 @@ import { api } from '@/trpc/react';
 import type { Protocols } from 'prisma/generated/enums';
 import { protocolsMapping } from '@/lib/data/mappings';
 import { format } from 'date-fns';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface ConfigInfoDialogProps {
     config: {
@@ -125,11 +126,18 @@ export function ConfigDialog({ config }: ConfigInfoDialogProps) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <Info className="h-4 w-4" />
-                </Button>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <Info className="h-4 w-4" />
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Config info</p>
+                    </TooltipContent>
+                </Tooltip>
             </DialogTrigger>
-            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-150">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Shield className="h-5 w-5" />
