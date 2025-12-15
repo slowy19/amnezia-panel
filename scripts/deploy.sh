@@ -27,24 +27,24 @@ get_project_root() {
 
 get_public_ip() {
     local ip=""
-    
+
     if command -v curl &> /dev/null; then
         ip=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || true)
     fi
-    
+
     if [ -z "$ip" ] && command -v curl &> /dev/null; then
         ip=$(curl -s --max-time 5 ipinfo.io/ip 2>/dev/null || true)
     fi
-    
+
     if [ -z "$ip" ] && command -v dig &> /dev/null; then
         ip=$(dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null || true)
     fi
-    
+
     if [ -z "$ip" ]; then
         ip=$(hostname -I | awk '{print $1}' 2>/dev/null || echo "localhost")
         print_warning "Could not get public IP, using local IP: $ip"
     fi
-    
+
     echo "$ip"
 }
 
@@ -61,8 +61,7 @@ generate_encryption_key() {
 
 read_env_value() {
     local key="$1"
-    if [ -f .env ]; then
-        # Используем grep без вывода ошибок и с правильным регулярным выражением
+    if [ -f .env ] && [ -s .env ]; then
         grep -E "^[[:space:]]*${key}[[:space:]]*=" .env 2>/dev/null | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//'
     else
         echo ""
@@ -74,33 +73,35 @@ prompt_with_default() {
     local prompt_text="$2"
     local default_value="$3"
     local is_secret="${4:-false}"
-    
-    local current_value
-    current_value=$(read_env_value "$var_name" || echo "")
-    
+
+    local current_value=""
+
+    if [ -f .env ] && [ -s .env ]; then
+        current_value=$(read_env_value "$var_name" || echo "")
+    fi
+
     if [ -n "$current_value" ] && [ "$current_value" != "\"\"" ] && [ "$current_value" != "''" ]; then
         default_value="$current_value"
     fi
-    
+
     local user_input
     local default_display
-    
+
     if [ "$is_secret" = "true" ] && [ -n "$default_value" ]; then
         default_display="[Use current value]"
     else
         default_display="[$default_value]"
     fi
-    
+
     echo -ne "$prompt_text $default_display: "
-    
+
     if [ "$is_secret" = "true" ]; then
         read -s user_input
         echo
     else
         read user_input
     fi
-    
-    # Если пользователь нажал Enter без ввода, используем значение по умолчанию
+
     if [ -z "$user_input" ]; then
         echo "$default_value"
     else
@@ -111,14 +112,14 @@ prompt_with_default() {
 add_cron_job() {
     local project_path="$1"
     local backup_script_path="$project_path/scripts/backup-db.sh"
-    
+
     local cron_command="0 0 */3 * * $backup_script_path"
     local temp_crontab=$(mktemp)
-    
+
     print_message "Setting up cron job for automatic database backup..."
-    
+
     crontab -l 2>/dev/null > "$temp_crontab" || true
-    
+
     if grep -qF "$backup_script_path" "$temp_crontab"; then
         print_message "Cron job already exists"
     else
@@ -126,15 +127,15 @@ add_cron_job() {
         crontab "$temp_crontab"
         print_message "Cron job added: Database backup every 3 days at midnight"
     fi
-    
+
     rm -f "$temp_crontab"
-    
+
     print_message "Current cron jobs:"
     crontab -l 2>/dev/null | grep -E "(backup|$project_path)" || echo "  (no backup-related cron jobs found)"
 }
 
 install_nodejs() {
-  
+
     if ! command -v node >/dev/null 2>&1; then
         if ! command -v curl >/dev/null 2>&1; then
             apt-get update -y
@@ -146,13 +147,13 @@ install_nodejs() {
         curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s lts
         hash -r
     fi
-  
+
     node -v && npm -v
-  
+
     if ! command -v yarn >/dev/null 2>&1; then
         npm install -g yarn
     fi
-  
+
     yarn -v
 }
 
@@ -164,14 +165,14 @@ main() {
     }
 
     install_nodejs
-    
+
     print_message "Starting deployment of AmneziaVPN Panel"
-    
+
     print_message "Checking SSL certificates..."
     if [ ! -d "certs" ]; then
         mkdir -p certs
     fi
-    
+
     if [ ! -f "certs/selfsigned.crt" ] || [ ! -f "certs/selfsigned.key" ]; then
         print_message "Generating self-signed SSL certificates..."
         openssl req -x509 -newkey rsa:4096 \
@@ -182,64 +183,88 @@ main() {
             print_error "Failed to generate SSL certificates"
             exit 1
         }
-        
+
         print_message "SSL certificates generated successfully"
     else
         print_message "SSL certificates already exist"
     fi
-    
+
     print_message "Loading default values..."
-    
+
     PUBLIC_IP=$(get_public_ip)
-    
+
     print_message "Configuring environment variables (press Enter to use default value):"
     echo "================================================"
-    
-    if [ ! -f .env ]; then
+
+    if [ ! -f .env ] || [ ! -s .env ]; then
+        print_message "No valid .env file found, will create new one"
         touch .env
-        print_message "Created new .env file"
+    else
+        print_message "Found existing .env file"
     fi
-    
-    NEXT_PUBLIC_VPN_NAME=$(prompt_with_default "NEXT_PUBLIC_VPN_NAME" "VPN Name" "AmneziaVPN")
-    NEXT_PUBLIC_USES_TELEGRAM_BOT=$(prompt_with_default "NEXT_PUBLIC_USES_TELEGRAM_BOT" "Use Telegram Bot (true/false)" "true")
-    
-    DB_USER=$(prompt_with_default "DB_USER" "Database username" "username")
-    DB_PASSWORD=$(prompt_with_default "DB_PASSWORD" "Database password" "password" "true")
-    DB_NAME=$(prompt_with_default "DB_NAME" "Database name" "panel")
-    
+
+    echo -n "VPN Service Name [AmneziaVPN]: "
+    read NEXT_PUBLIC_VPN_NAME
+    NEXT_PUBLIC_VPN_NAME=${NEXT_PUBLIC_VPN_NAME:-AmneziaVPN}
+
+    echo -n "Use Telegram Bot (true/false) [true]: "
+    read NEXT_PUBLIC_USES_TELEGRAM_BOT
+    NEXT_PUBLIC_USES_TELEGRAM_BOT=${NEXT_PUBLIC_USES_TELEGRAM_BOT:-true}
+
+    echo -n "Database username [username]: "
+    read DB_USER
+    DB_USER=${DB_USER:-username}
+
+    echo -n "Database password [password]: "
+    read -s DB_PASSWORD
+    echo
+    DB_PASSWORD=${DB_PASSWORD:-password}
+
+    echo -n "Database name [panel]: "
+    read DB_NAME
+    DB_NAME=${DB_NAME:-panel}
+
     DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}"
-    
-    AMNEZIA_API_HOST=$(prompt_with_default "AMNEZIA_API_HOST" "Amnezia API Host" "$PUBLIC_IP")
-    AMNEZIA_API_PORT=$(prompt_with_default "AMNEZIA_API_PORT" "Amnezia API Port" "80")
-    AMNEZIA_API_KEY=$(prompt_with_default "AMNEZIA_API_KEY" "Amnezia API Key" "" "true")
-    
-    TELEGRAM_BOT_TOKEN=$(prompt_with_default "TELEGRAM_BOT_TOKEN" "Telegram Bot Token (optional)" "" "true")
-    
+
+    echo -n "Amnezia API Host [$PUBLIC_IP]: "
+    read AMNEZIA_API_HOST
+    AMNEZIA_API_HOST=${AMNEZIA_API_HOST:-$PUBLIC_IP}
+
+    echo -n "Amnezia API Port [80]: "
+    read AMNEZIA_API_PORT
+    AMNEZIA_API_PORT=${AMNEZIA_API_PORT:-80}
+
+    echo -n "Amnezia API Key: "
+    read -s AMNEZIA_API_KEY
+    echo
+    AMNEZIA_API_KEY=${AMNEZIA_API_KEY:-""}
+
+    echo -n "Telegram Bot Token (optional, press Enter for none): "
+    read -s TELEGRAM_BOT_TOKEN
+    echo
+    TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-""}
+
     if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
         NEXT_PUBLIC_USES_TELEGRAM_BOT="false"
     else
         NEXT_PUBLIC_USES_TELEGRAM_BOT="true"
     fi
-    
-    EXISTING_ENCRYPTION_KEY=$(read_env_value "ENCRYPTION_KEY")
-    if [ -n "$EXISTING_ENCRYPTION_KEY" ]; then
-        ENCRYPTION_KEY="$EXISTING_ENCRYPTION_KEY"
-        print_message "Using existing ENCRYPTION_KEY"
+
+    print_message "Generating new ENCRYPTION_KEY..."
+    ENCRYPTION_KEY=$(generate_encryption_key)
+    if [ -n "$ENCRYPTION_KEY" ]; then
+        print_message "ENCRYPTION_KEY generated successfully"
     else
-        print_message "Generating new ENCRYPTION_KEY..."
-        ENCRYPTION_KEY=$(generate_encryption_key)
-        if [ -n "$ENCRYPTION_KEY" ]; then
-            print_message "ENCRYPTION_KEY generated successfully"
-        else
-            print_error "Failed to generate ENCRYPTION_KEY"
-            exit 1
-        fi
+        print_error "Failed to generate ENCRYPTION_KEY"
+        exit 1
     fi
-    
-    NODE_ENV=$(prompt_with_default "NODE_ENV" "Node environment" "production")
-    
+
+    echo -n "Node environment (development/test/production) [production]: "
+    read NODE_ENV
+    NODE_ENV=${NODE_ENV:-production}
+
     print_message "Creating/updating .env file..."
-    
+
     cat > .env << EOF
 # VPN Name Service
 NEXT_PUBLIC_VPN_NAME="${NEXT_PUBLIC_VPN_NAME}"
@@ -268,32 +293,32 @@ ENCRYPTION_KEY="${ENCRYPTION_KEY}"
 # development or test or production
 NODE_ENV="${NODE_ENV}"
 EOF
-    
+
     print_message ".env file created/updated successfully"
-    
+
     print_message "Checking Docker and Docker Compose..."
-    
+
     if ! command -v docker &> /dev/null; then
         print_error "Docker is not installed. Please install Docker using official docs."
         exit 1
     fi
-    
+
     if ! command -v docker compose &> /dev/null; then
         print_error "Docker Compose is not installed. Please install Docker Compose using official docs."
         exit 1
     fi
-    
+
     print_message "Building and starting Docker containers..."
-    
+
     docker compose down 2>/dev/null || true
 
     print_message "Starting Docker..."
     docker compose --env-file .env up -d --build
-    
+
     print_message "Checking container status..."
-    
+
     sleep 5
-    
+
     if docker ps | grep -q "app-amnezia-panel"; then
         print_message "Application container is running"
     else
@@ -301,7 +326,7 @@ EOF
         docker compose logs app
         exit 1
     fi
-    
+
     if docker ps | grep -q "db-amnezia-panel"; then
         print_message "Database container is running"
     else
@@ -309,9 +334,9 @@ EOF
         docker compose logs db
         exit 1
     fi
-    
+
     add_cron_job "$PROJECT_ROOT"
-    
+
     print_message "================================================"
     print_message "Deployment completed successfully!"
     print_message ""
