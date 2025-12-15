@@ -29,15 +29,15 @@ get_public_ip() {
     local ip=""
     
     if command -v curl &> /dev/null; then
-        ip=$(curl -s --max-time 5 ifconfig.me)
+        ip=$(curl -s --max-time 5 ifconfig.me 2>/dev/null || true)
     fi
     
     if [ -z "$ip" ] && command -v curl &> /dev/null; then
-        ip=$(curl -s --max-time 5 ipinfo.io/ip)
+        ip=$(curl -s --max-time 5 ipinfo.io/ip 2>/dev/null || true)
     fi
     
     if [ -z "$ip" ] && command -v dig &> /dev/null; then
-        ip=$(dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null || echo "")
+        ip=$(dig +short myip.opendns.com @resolver1.opendns.com 2>/dev/null || true)
     fi
     
     if [ -z "$ip" ]; then
@@ -50,9 +50,9 @@ get_public_ip() {
 
 generate_encryption_key() {
     if command -v node &> /dev/null; then
-        node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+        node -e "console.log(require('crypto').randomBytes(32).toString('base64'))" 2>/dev/null || echo ""
     elif command -v openssl &> /dev/null; then
-        openssl rand -base64 32
+        openssl rand -base64 32 2>/dev/null || echo ""
     else
         print_error "Neither node nor openssl found. Cannot generate encryption key."
         exit 1
@@ -62,7 +62,10 @@ generate_encryption_key() {
 read_env_value() {
     local key="$1"
     if [ -f .env ]; then
-        grep -E "^${key}=" .env | cut -d '=' -f2- | sed 's/^"//;s/"$//'
+        # Используем grep без вывода ошибок и с правильным регулярным выражением
+        grep -E "^[[:space:]]*${key}[[:space:]]*=" .env 2>/dev/null | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//'
+    else
+        echo ""
     fi
 }
 
@@ -72,8 +75,10 @@ prompt_with_default() {
     local default_value="$3"
     local is_secret="${4:-false}"
     
-    local current_value=$(read_env_value "$var_name")
-    if [ -n "$current_value" ]; then
+    local current_value
+    current_value=$(read_env_value "$var_name" || echo "")
+    
+    if [ -n "$current_value" ] && [ "$current_value" != "\"\"" ] && [ "$current_value" != "''" ]; then
         default_value="$current_value"
     fi
     
@@ -86,7 +91,7 @@ prompt_with_default() {
         default_display="[$default_value]"
     fi
     
-    echo -n "$prompt_text $default_display: "
+    echo -ne "$prompt_text $default_display: "
     
     if [ "$is_secret" = "true" ]; then
         read -s user_input
@@ -95,6 +100,7 @@ prompt_with_default() {
         read user_input
     fi
     
+    # Если пользователь нажал Enter без ввода, используем значение по умолчанию
     if [ -z "$user_input" ]; then
         echo "$default_value"
     else
@@ -152,7 +158,10 @@ install_nodejs() {
 
 main() {
     PROJECT_ROOT=$(get_project_root)
-    cd "$PROJECT_ROOT"
+    cd "$PROJECT_ROOT" || {
+        print_error "Failed to change directory to $PROJECT_ROOT"
+        exit 1
+    }
 
     install_nodejs
     
@@ -169,14 +178,12 @@ main() {
             -keyout certs/selfsigned.key \
             -out certs/selfsigned.crt \
             -days 365 -nodes \
-            -subj "/CN=amnezia-panel.local" 2>/dev/null
-        
-        if [ $? -eq 0 ]; then
-            print_message "SSL certificates generated successfully"
-        else
+            -subj "/CN=amnezia-panel.local" 2>/dev/null || {
             print_error "Failed to generate SSL certificates"
             exit 1
-        fi
+        }
+        
+        print_message "SSL certificates generated successfully"
     else
         print_message "SSL certificates already exist"
     fi
@@ -187,6 +194,11 @@ main() {
     
     print_message "Configuring environment variables (press Enter to use default value):"
     echo "================================================"
+    
+    if [ ! -f .env ]; then
+        touch .env
+        print_message "Created new .env file"
+    fi
     
     NEXT_PUBLIC_VPN_NAME=$(prompt_with_default "NEXT_PUBLIC_VPN_NAME" "VPN Name" "AmneziaVPN")
     NEXT_PUBLIC_USES_TELEGRAM_BOT=$(prompt_with_default "NEXT_PUBLIC_USES_TELEGRAM_BOT" "Use Telegram Bot (true/false)" "true")
@@ -218,6 +230,9 @@ main() {
         ENCRYPTION_KEY=$(generate_encryption_key)
         if [ -n "$ENCRYPTION_KEY" ]; then
             print_message "ENCRYPTION_KEY generated successfully"
+        else
+            print_error "Failed to generate ENCRYPTION_KEY"
+            exit 1
         fi
     fi
     
