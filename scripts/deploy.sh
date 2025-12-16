@@ -22,7 +22,7 @@ print_error() {
 get_project_root() {
     local script_dir
     script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-    echo "$script_dir"
+    echo "$(dirname "$script_dir")"
 }
 
 get_public_ip() {
@@ -61,8 +61,9 @@ generate_encryption_key() {
 
 read_env_value() {
     local key="$1"
-    if [ -f .env ] && [ -s .env ]; then
-        grep -E "^[[:space:]]*${key}[[:space:]]*=" .env 2>/dev/null | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//'
+    local env_file="$2"
+    if [ -f "$env_file" ] && [ -s "$env_file" ]; then
+        grep -E "^[[:space:]]*${key}[[:space:]]*=" "$env_file" 2>/dev/null | head -n 1 | cut -d '=' -f2- | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/^"//' -e 's/"$//' -e "s/^'//" -e "s/'$//"
     else
         echo ""
     fi
@@ -71,50 +72,65 @@ read_env_value() {
 prompt_with_default() {
     local var_name="$1"
     local prompt_text="$2"
-    local default_value="$3"
+    local script_default_value="$3"
     local is_secret="${4:-false}"
+    local env_file="$5"
 
     local current_value=""
+    local display_value=""
+    local default_value="$script_default_value"
 
-    if [ -f .env ] && [ -s .env ]; then
-        current_value=$(read_env_value "$var_name" || echo "")
+    if [ -f "$env_file" ] && [ -s "$env_file" ]; then
+        current_value=$(read_env_value "$var_name" "$env_file")
     fi
 
     if [ -n "$current_value" ] && [ "$current_value" != "\"\"" ] && [ "$current_value" != "''" ]; then
         default_value="$current_value"
     fi
 
-    local user_input
-    local default_display
-
     if [ "$is_secret" = "true" ] && [ -n "$default_value" ]; then
-        default_display="[Use current value]"
+        display_value="[Use existing value]"
+    elif [ -n "$default_value" ]; then
+        display_value="[$default_value]"
     else
-        default_display="[$default_value]"
+        display_value="[]"
     fi
 
-    echo -ne "$prompt_text $default_display: "
+    exec 3>/dev/tty
+    printf "%s %s: " "$prompt_text" "$display_value" >&3
 
+    local user_input
     if [ "$is_secret" = "true" ]; then
-        read -s user_input
-        echo
+        user_input=$(head -1 < /dev/tty)
+        if [ -z "$user_input" ] && [ -n "$current_value" ]; then
+            echo "$current_value"
+        elif [ -z "$user_input" ] && [ -n "$script_default_value" ]; then
+            echo "$script_default_value"
+        else
+            echo "$user_input"
+        fi
     else
-        read user_input
+        user_input=$(head -1 < /dev/tty)
+        if [ -z "$user_input" ]; then
+            echo "$default_value"
+        else
+            echo "$user_input"
+        fi
     fi
-
-    if [ -z "$user_input" ]; then
-        echo "$default_value"
-    else
-        echo "$user_input"
-    fi
+    exec 3>&-
 }
 
 add_cron_job() {
-    local project_path="$1"
-    local backup_script_path="$project_path/scripts/backup-db.sh"
+    local project_root="$1"
+    local backup_script_path="$project_root/scripts/backup-db.sh"
 
-    local cron_command="0 0 */3 * * $backup_script_path"
+    local cron_command="0 0 */3 * * /bin/bash $backup_script_path"
     local temp_crontab=$(mktemp)
+
+    if ! command -v crontab -l >/dev/null 2>&1; then
+        print_message "Installing cron..."
+        apt install cron -y
+    fi
 
     print_message "Setting up cron job for automatic database backup..."
 
@@ -131,11 +147,10 @@ add_cron_job() {
     rm -f "$temp_crontab"
 
     print_message "Current cron jobs:"
-    crontab -l 2>/dev/null | grep -E "(backup|$project_path)" || echo "  (no backup-related cron jobs found)"
+    crontab -l 2>/dev/null | grep -E "(backup|$project_root)" || echo "  (no backup-related cron jobs found)"
 }
 
 install_nodejs() {
-
     if ! command -v node >/dev/null 2>&1; then
         if ! command -v curl >/dev/null 2>&1; then
             apt-get update -y
@@ -143,30 +158,43 @@ install_nodejs() {
         fi
 
         print_message "Installing NodeJS and yarn..."
-
         curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s lts
         hash -r
     fi
 
-    node -v && npm -v
+    node -v > /dev/null 2>&1 && npm -v > /dev/null 2>&1
 
     if ! command -v yarn >/dev/null 2>&1; then
-        npm install -g yarn
+        npm install -g yarn > /dev/null 2>&1
     fi
 
-    yarn -v
+    yarn -v > /dev/null 2>&1
 }
 
 main() {
     PROJECT_ROOT=$(get_project_root)
-    cd "$PROJECT_ROOT" || {
-        print_error "Failed to change directory to $PROJECT_ROOT"
-        exit 1
-    }
+    PANEL_DIR="$PROJECT_ROOT/panel"
+
+    print_message "Project root: $PROJECT_ROOT"
+    print_message "Panel directory: $PANEL_DIR"
+
+    local original_dir=$(pwd)
+
+    if [ ! -d "$PANEL_DIR" ]; then
+        print_message "Creating panel directory..."
+        mkdir -p "$PANEL_DIR"
+    fi
+
+    ENV_FILE="$PANEL_DIR/.env"
 
     install_nodejs
 
     print_message "Starting deployment of AmneziaVPN Panel"
+
+    cd "$PANEL_DIR" || {
+        print_error "Failed to change directory to $PANEL_DIR"
+        exit 1
+    }
 
     print_message "Checking SSL certificates..."
     if [ ! -d "certs" ]; then
@@ -196,53 +224,35 @@ main() {
     print_message "Configuring environment variables (press Enter to use default value):"
     echo "================================================"
 
-    if [ ! -f .env ] || [ ! -s .env ]; then
-        print_message "No valid .env file found, will create new one"
-        touch .env
+    if [ ! -f "$ENV_FILE" ]; then
+        print_message "No .env file found, will create new one"
     else
-        print_message "Found existing .env file"
+        if [ ! -s "$ENV_FILE" ]; then
+            print_message "Found empty .env file, will recreate it"
+        else
+            print_message "Found existing .env file at $ENV_FILE"
+        fi
     fi
 
-    echo -n "VPN Service Name [AmneziaVPN]: "
-    read NEXT_PUBLIC_VPN_NAME
-    NEXT_PUBLIC_VPN_NAME=${NEXT_PUBLIC_VPN_NAME:-AmneziaVPN}
+    NEXT_PUBLIC_VPN_NAME=$(prompt_with_default "NEXT_PUBLIC_VPN_NAME" "VPN Service Name" "AmneziaVPN" false "$ENV_FILE")
 
-    echo -n "Use Telegram Bot (true/false) [true]: "
-    read NEXT_PUBLIC_USES_TELEGRAM_BOT
-    NEXT_PUBLIC_USES_TELEGRAM_BOT=${NEXT_PUBLIC_USES_TELEGRAM_BOT:-true}
+    NEXT_PUBLIC_USES_TELEGRAM_BOT=$(prompt_with_default "NEXT_PUBLIC_USES_TELEGRAM_BOT" "Use Telegram Bot (true/false)" "true" false "$ENV_FILE")
 
-    echo -n "Database username [username]: "
-    read DB_USER
-    DB_USER=${DB_USER:-username}
+    DB_USER=$(prompt_with_default "DB_USER" "Database username" "username" false "$ENV_FILE")
 
-    echo -n "Database password [password]: "
-    read -s DB_PASSWORD
-    echo
-    DB_PASSWORD=${DB_PASSWORD:-password}
+    DB_PASSWORD=$(prompt_with_default "DB_PASSWORD" "Database password" "password" true "$ENV_FILE")
 
-    echo -n "Database name [panel]: "
-    read DB_NAME
-    DB_NAME=${DB_NAME:-panel}
+    DB_NAME=$(prompt_with_default "DB_NAME" "Database name" "panel" false "$ENV_FILE")
 
     DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}"
 
-    echo -n "Amnezia API Host [$PUBLIC_IP]: "
-    read AMNEZIA_API_HOST
-    AMNEZIA_API_HOST=${AMNEZIA_API_HOST:-$PUBLIC_IP}
+    AMNEZIA_API_HOST=$(prompt_with_default "AMNEZIA_API_HOST" "Amnezia API Host" "$PUBLIC_IP" false "$ENV_FILE")
 
-    echo -n "Amnezia API Port [80]: "
-    read AMNEZIA_API_PORT
-    AMNEZIA_API_PORT=${AMNEZIA_API_PORT:-80}
+    AMNEZIA_API_PORT=$(prompt_with_default "AMNEZIA_API_PORT" "Amnezia API Port" "80" false "$ENV_FILE")
 
-    echo -n "Amnezia API Key: "
-    read -s AMNEZIA_API_KEY
-    echo
-    AMNEZIA_API_KEY=${AMNEZIA_API_KEY:-""}
+    AMNEZIA_API_KEY=$(prompt_with_default "AMNEZIA_API_KEY" "Amnezia API Key" "" true "$ENV_FILE")
 
-    echo -n "Telegram Bot Token (optional, press Enter for none): "
-    read -s TELEGRAM_BOT_TOKEN
-    echo
-    TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-""}
+    TELEGRAM_BOT_TOKEN=$(prompt_with_default "TELEGRAM_BOT_TOKEN" "Telegram Bot Token (optional, press Enter for none)" "" true "$ENV_FILE")
 
     if [ -z "$TELEGRAM_BOT_TOKEN" ]; then
         NEXT_PUBLIC_USES_TELEGRAM_BOT="false"
@@ -250,22 +260,27 @@ main() {
         NEXT_PUBLIC_USES_TELEGRAM_BOT="true"
     fi
 
-    print_message "Generating new ENCRYPTION_KEY..."
-    ENCRYPTION_KEY=$(generate_encryption_key)
-    if [ -n "$ENCRYPTION_KEY" ]; then
-        print_message "ENCRYPTION_KEY generated successfully"
+    ENCRYPTION_KEY=$(read_env_value "ENCRYPTION_KEY" "$ENV_FILE")
+    if [ -z "$ENCRYPTION_KEY" ]; then
+        print_message "Generating new ENCRYPTION_KEY..."
+        ENCRYPTION_KEY=$(generate_encryption_key)
+        if [ -n "$ENCRYPTION_KEY" ]; then
+            print_message "ENCRYPTION_KEY generated successfully"
+        else
+            print_error "Failed to generate ENCRYPTION_KEY"
+            exit 1
+        fi
     else
-        print_error "Failed to generate ENCRYPTION_KEY"
-        exit 1
+        print_message "Using existing ENCRYPTION_KEY from .env"
     fi
 
-    echo -n "Node environment (development/test/production) [production]: "
-    read NODE_ENV
-    NODE_ENV=${NODE_ENV:-production}
+    NODE_ENV=$(prompt_with_default "NODE_ENV" "Node environment (development/test/production)" "production" false "$ENV_FILE")
 
-    print_message "Creating/updating .env file..."
+    print_message "Creating/updating .env file at $ENV_FILE..."
 
-    cat > .env << EOF
+    ENV_TEMP=$(mktemp)
+
+    cat > "$ENV_TEMP" << EOF
 # VPN Name Service
 NEXT_PUBLIC_VPN_NAME="${NEXT_PUBLIC_VPN_NAME}"
 # true or false
@@ -294,7 +309,14 @@ ENCRYPTION_KEY="${ENCRYPTION_KEY}"
 NODE_ENV="${NODE_ENV}"
 EOF
 
-    print_message ".env file created/updated successfully"
+    mv "$ENV_TEMP" "$ENV_FILE"
+
+    chmod 600 "$ENV_FILE"
+
+    print_message ".env file created/updated successfully at $ENV_FILE"
+
+    print_message "Installing project dependencies..."
+    yarn
 
     print_message "Checking Docker and Docker Compose..."
 
@@ -310,7 +332,7 @@ EOF
 
     print_message "Building and starting Docker containers..."
 
-    docker compose down 2>/dev/null || true
+    docker compose down || true
 
     print_message "Starting Docker..."
     docker compose --env-file .env up -d --build
@@ -335,7 +357,11 @@ EOF
         exit 1
     fi
 
+    cd "$original_dir"
+
     add_cron_job "$PROJECT_ROOT"
+
+    cd "$PANEL_DIR"
 
     print_message "================================================"
     print_message "Deployment completed successfully!"
