@@ -7,7 +7,7 @@ BACKUP_FILE="${BACKUP_DIR}/backup-${TIMESTAMP}.sql"
 AMNEZIA_PANEL_DIR=$(find /root /home /opt -type d -name "amnezia-panel" 2>/dev/null | head -n 1)
 
 if [ -n "$AMNEZIA_PANEL_DIR" ]; then
-    ENV_FILE="${AMNEZIA_PANEL_DIR}/.env"
+    ENV_FILE="${AMNEZIA_PANEL_DIR}/panel/.env"
     if [ -f "$ENV_FILE" ]; then
         source "$ENV_FILE"
     else

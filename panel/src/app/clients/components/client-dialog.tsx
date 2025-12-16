@@ -77,18 +77,18 @@ export function UpdateClientDialog({ id, name, telegramId }: Props) {
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Tooltip>
+            <Tooltip>
+                <DialogTrigger asChild>
                     <TooltipTrigger asChild>
                         <Button variant="ghost" size="sm" className="cursor-pointer">
                             <Edit className="h-4 w-4" />
                         </Button>
                     </TooltipTrigger>
-                    <TooltipContent>
-                        <p>Edit client</p>
-                    </TooltipContent>
-                </Tooltip>
-            </DialogTrigger>
+                </DialogTrigger>
+                <TooltipContent>
+                    <p>Edit client</p>
+                </TooltipContent>
+            </Tooltip>
             <DialogContent className="sm:max-w-[525px]">
                 <DialogHeader>
                     <DialogTitle>Update client</DialogTitle>
