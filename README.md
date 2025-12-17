@@ -3,7 +3,7 @@
 A modern web administration panel for AmneziaVPN, built with Next.js App Router, T3 Stack, and tRPC. This panel provides an intuitive interface for managing your AmneziaVPN instances.
 
 [![Built with T3 Stack](https://img.shields.io/badge/Built%20with-T3%20Stack-blue)](#)
-[![Next.js](https://img.shields.io/badge/Next.js-14-black)](#)
+[![Next.js](https://img.shields.io/badge/Next.js-16-black)](#)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)](#)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
