@@ -363,23 +363,24 @@ EOF
 
     cd "$PANEL_DIR"
 
-    print_message "================================================"
+    echo "================================================"
     print_message "Deployment completed successfully!"
-    print_message ""
+    echo ""
     print_message "Application is available at:"
     print_message "  https://${AMNEZIA_API_HOST}:8443"
-    print_message ""
+    echo ""
     print_message "Containers running:"
     docker compose ps
-    print_message ""
+    echo ""
     print_message "To view logs:"
     print_message "  docker compose logs -f"
-    print_message ""
+    echo ""
     print_message "To stop the application:"
     print_message "  docker compose down"
-    print_message ""
+    echo ""
     print_warning "Note: Using self-signed certificate. You may need to accept the security warning in your browser."
-    print_message "================================================"
+    print_warning "Note: If you have ENCRYPTION_KEY and old database then change .env."
+    echo "================================================"
 }
 
 main "$@"
