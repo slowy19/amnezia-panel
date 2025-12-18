@@ -41,6 +41,10 @@ cd amnezia-panel
 bash scripts/deploy.sh
 ```
 
+### Step 3: Security
+
+Protect port 8443 properly with a firewall or reverse proxy (nginx).
+
 ## Encryption 
 
 Client VPN configurations are **encrypted at rest** in the database using the **AES-256-GCM** algorithm. This industry-standard encryption ensures that sensitive client data remains secure, even in the event of unauthorized database access.
