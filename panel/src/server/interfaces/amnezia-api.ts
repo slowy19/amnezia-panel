@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export type Protocol = 'amneziawg' | 'amneziawg2' | 'xray';
+export type Protocol = 'amneziawg' | 'amneziawg3' | 'xray';
 
 export interface IPeer {
     id: string;
@@ -75,7 +75,7 @@ export interface ServerBackup {
         serverPublicKey: string;
         clients: Clients[];
     };
-    amneziaWg2?: {
+    amneziaWg3?: {
         wgConfig: string;
         presharedKey: string;
         serverPublicKey: string;
@@ -167,7 +167,7 @@ export const serverBackupSchema = z.object({
     serverId: z.string(),
     protocols: z.array(z.string()),
     amnezia: amneziaSchema.optional(),
-    amneziaWg2: amneziaSchema.optional(),
+    amneziaWg3: amneziaSchema.optional(),
     xray: xraySchema.optional(),
 });
 

@@ -55,7 +55,7 @@ export default function ServerInfo({ server }: ServerInfoProps) {
                                 variant="default"
                                 key={protocol}
                                 className={getProtocolColor(
-                                    apiProtocolsMapping[protocol as 'amneziawg' | 'amneziawg2' | 'xray']
+                                    apiProtocolsMapping[protocol as 'amneziawg' | 'amneziawg3' | 'xray']
                                 )}>
                                 {protocolsServerMapping[protocol]}
                             </Badge>

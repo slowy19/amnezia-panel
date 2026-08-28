@@ -80,7 +80,7 @@ enum Roles {
 
 enum Protocols {
     AMNEZIAWG
-    AMNEZIAWG2
+    AMNEZIAWG2 // AmneziaWG 3.1
     XRAY
 }
 
